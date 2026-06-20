@@ -1,0 +1,38 @@
+[
+  {
+    "name": "All About AI",
+    "channel_id": "UCR9j1jqqB5Rse69wjUnbYwA",
+    "handle": "@AllAboutAI",
+    "platform": "youtube",
+    "active": true,
+    "priority": "high",
+    "note": "Claude Code MCP/Skill 전문 채널 — 가장 직접적"
+  },
+  {
+    "name": "Fireship",
+    "channel_id": "UCsBjURrPoezykLs9EqgamOA",
+    "handle": "@Fireship",
+    "platform": "youtube",
+    "active": true,
+    "priority": "medium",
+    "note": "MCP/AI 트렌드 즉각 반응, 개발자 커뮤니티 영향력 최고"
+  },
+  {
+    "name": "Dave Ebbelaar",
+    "channel_id": "UCn8ujwUInbJkBhffxqAPBVQ",
+    "handle": "@daveebbelaar",
+    "platform": "youtube",
+    "active": true,
+    "priority": "medium",
+    "note": "MCP 실습 튜토리얼 전문"
+  },
+  {
+    "name": "Liam Ottley",
+    "channel_id": "UCui4jxDaMb53Gdh-AZUTPAg",
+    "handle": "@LiamOttley",
+    "platform": "youtube",
+    "active": true,
+    "priority": "low",
+    "note": "AI 에이전트 자동화 비즈니스"
+  }
+]
