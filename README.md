@@ -10,8 +10,8 @@ AI 에이전트(Alpha 등)의 도구·스킬·MCP를 자동으로 탐지·업그
 
 | 프로젝트 | 설명 | 상태 |
 |---------|------|------|
-| [Trend-Following-Youtube](./Trend-Following-Youtube/) | YouTube 인플루언서 모니터링 → Claude Code 스킬/MCP 자동 설치 | ✅ 가동 중 |
-| [Claude-App-Factory](./Claude-App-Factory/) | Claude 중심 로컬 앱 빌딩 시스템 표준 아키텍처(MCP 신경망 + 설계→배포→측정 파이프라인). 회장 로컬 구축 가이드 | 📐 문서 |
+| [Trend-Following-Youtube](./Trend-Following-Youtube/) | YouTube 모니터링 → 스킬/MCP 자동 설치. **⚠️ 현재는 RSS 텍스트 스크래퍼 — 영상 시청·이해 미구현. [비전 vs 현실](./Trend-Following-Youtube/VISION_VS_REALITY.md) 참조** | 🟡 Phase 1/4 |
+| [Claude-App-Factory](./Claude-App-Factory/) | Claude 중심 로컬 앱 빌딩 시스템 표준 아키텍처(MCP 신경망 + 설계→배포→측정 파이프라인) + 실행 가능 부트스트랩 | 📐 문서+스크립트 |
 
 ---
 
