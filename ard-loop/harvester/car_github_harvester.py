@@ -57,12 +57,22 @@ def save_json(path, obj):
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+_TOKEN_DISABLED = False  # stale/invalid GH_TOKEN을 한 번 감지하면 이후 무인증으로
+
+
 def gh_get(url):
+    """GitHub API GET. 토큰이 있으면 rate↑, 없거나 invalid면 무인증(60/h)으로 동작.
+
+    회장 환경 함정 방어: VS Code 등이 박제한 stale GH_TOKEN이 401을 내면,
+    그 토큰을 버리고 무인증으로 1회 폴백한다(이후 호출도 무인증). 무인증이어도
+    public read는 core 60/h·search 10/min 한도 내에서 정상 수확된다.
+    """
+    global _TOKEN_DISABLED
     headers = {
         "User-Agent": "G2-CAR-Harvester",
         "Accept": "application/vnd.github+json",
     }
-    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    token = None if _TOKEN_DISABLED else (os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN"))
     if token:
         headers["Authorization"] = f"Bearer {token}"
     try:
@@ -70,6 +80,10 @@ def gh_get(url):
         with urllib.request.urlopen(req, timeout=15) as resp:
             return json.loads(resp.read().decode("utf-8", errors="ignore")), None
     except urllib.error.HTTPError as e:
+        if e.code == 401 and token and not _TOKEN_DISABLED:
+            _TOKEN_DISABLED = True
+            log("token_invalid_fallback_anon", note="GH_TOKEN 401 → 무인증 폴백")
+            return gh_get(url)
         return None, f"HTTP {e.code}"
     except Exception as e:
         return None, str(e)
