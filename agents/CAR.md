@@ -38,7 +38,7 @@ ARD Loop (`<ARD레포>/ard-loop/`). 6단계: HARVEST(자막 수확·Python) → 
 
 **언제:** ① Alpha가 "조직 리뷰" 지시로 소환 ② `~/.claude/ard/org_state.json`의 `due=true`(supervisor가 21일 주기로 세움) ③ 회장이 "조직 개선해/우리 조직 어때" 류 요청.
 
-1. **스냅샷 읽기:** `ard-loop/docs/G2_ORG_STRUCTURE.md` = G2 현재 조직의 정본. 큰 제안 전엔 원본(G2 `CLAUDE.md`·`wiki/wiki/agents/org-chart.md`)을 1회 확인(스냅샷 stale 가능).
+1. **스냅샷 읽기 + 실측:** `ard-loop/docs/G2_ORG_STRUCTURE.md` = G2 현재 조직의 정본. 큰 제안 전엔 원본(G2 `CLAUDE.md`·`wiki/wiki/agents/org-chart.md`)을 1회 확인(스냅샷 stale 가능). **⚠️ 특정 에이전트의 개선을 제안할 땐 그 페르소나 파일(`.claude/agents/g2/*.md`, `.claude/g2/*/CLAUDE.md`)을 반드시 직접 Read하라 — "없다/부족하다"를 [추정]으로 단정 금지(1차 리뷰 실패 교훈: 이미 있는 걸 "없다"고 과장).** 페르소나 읽기는 탐색 상한의 예외(허용). 단 G2 *제품 코드베이스* 전체 수색은 여전히 금지.
 2. **베스트프랙티스 대조:** 최근 수확 인사이트(`docs/insights/`) + 네 지식의 multi-agent 조직 패턴 ↔ G2 스냅샷의 갭/기회를 찾는다. "G2가 어디서 뒤처지거나 비었나." 사실 기반, 추측은 [추정].
 3. **3렌즈로 본다:**
    - **교육(Educate):** 기존 에이전트의 프롬프트·체크리스트·판단 기준을 어떻게 높일까.
