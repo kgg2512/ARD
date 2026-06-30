@@ -1,0 +1,40 @@
+{
+  "_comment": "ARD Loop 소스 설정. CAR이 보고 이해할 출처 + 자동적용 신뢰 allowlist. 채널 추가는 youtube[] 에 1줄.",
+  "harvest": {
+    "max_per_channel": 5,
+    "interval_hours": 24,
+    "transcript_languages": ["en", "ko"],
+    "relevance_keywords": [
+      "claude code", "claude agent", "mcp", "model context protocol",
+      "ai agent", "ai orchestra", "agent orchestration", "multi-agent",
+      "subagent", "agentic", "skill", "workflow", "automation",
+      "cursor", "windsurf", "n8n", "langgraph", "autogen", "crewai",
+      "solo founder", "one person startup", "indie hacker", "vibe coding"
+    ]
+  },
+  "youtube": [
+    { "name": "All About AI",   "channel_id": "UCR9j1jqqB5Rse69wjUnbYwA", "handle": "@AllAboutAI",   "priority": "high",   "active": true, "note": "Claude Code MCP/Skill 전문" },
+    { "name": "Fireship",       "channel_id": "UCsBjURrPoezykLs9EqgamOA", "handle": "@Fireship",     "priority": "medium", "active": true, "note": "AI 트렌드 즉각 반응" },
+    { "name": "Dave Ebbelaar",  "channel_id": "UCn8ujwUInbJkBhffxqAPBVQ", "handle": "@daveebbelaar", "priority": "high",   "active": true, "note": "MCP 실습 튜토리얼" },
+    { "name": "Liam Ottley",    "channel_id": "UCui4jxDaMb53Gdh-AZUTPAg", "handle": "@LiamOttley",   "priority": "low",    "active": true, "note": "AI 에이전트 자동화 비즈니스" }
+  ],
+  "github": {
+    "_comment": "Phase 2b: 릴리스/awesome 목록 추적. CAR이 신규 스킬/MCP 후보 발굴. 토큰 없이 공개 API 사용.",
+    "watch_repos": [
+      "modelcontextprotocol/servers",
+      "anthropics/claude-code",
+      "punkpeye/awesome-mcp-servers"
+    ],
+    "active": false
+  },
+  "apply_policy": {
+    "_comment": "🔒 CSO 게이트: 아래 출처 + 설치수 1K+ 만 자동적용. 그 외는 회장 승인 큐.",
+    "trusted_publishers": [
+      "anthropics", "anthropic-ai", "modelcontextprotocol", "vercel-labs",
+      "microsoft", "supabase", "cloudflare", "stripe", "upstash", "github"
+    ],
+    "min_installs_for_auto": 1000,
+    "auto_apply": true,
+    "require_approval_for_settings_json": true
+  }
+}

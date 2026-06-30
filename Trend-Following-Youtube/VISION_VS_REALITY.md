@@ -62,4 +62,16 @@
 ## 6. 회장 결정 필요
 
 Phase 2 구현(자막 파이프라인 + Claude 이해 단계)은 외부 라이브러리·네트워크 정책·새 훅이 얽힌 **실질 코딩 작업(T4급)**이다. 진행하려면 회장 "go"가 필요하다. 진행 시 검증 하드게이트·도메인 주입 그대로 적용.
+
+---
+
+## ✅ 갱신 (2026-06-30) — Phase 2~3 구현 완료, ard-loop로 승계
+
+회장 "go" 승인 → 새 시스템 **[`ard-loop`](../ard-loop/)** 으로 구현됨. 이 레거시 RSS 스크래퍼는 ard-loop의 자막 기반 파이프라인으로 대체된다.
+- **HARVEST:** `car_harvester.py` — RSS→**자막 수집**→큐 (드디어 영상 내용 텍스트 확보)
+- **UNDERSTAND/APPLY/VERIFY/REPORT:** **CAR 에이전트**(Claude)가 큐를 읽고 이해·적용·검증·보고
+- **HEAL:** `car_supervisor.py` — 스케줄 감독·자가복구
+- 보안: 신뢰 출처만 자동적용(공급망 게이트). 설계: `ard-loop/README.md`.
+
+남은 것: 회장 로컬 `install.ps1` 실행 후 라이브 검증, Phase 4(영상 멀티모달·GitHub 트렌딩 심화).
 </content>

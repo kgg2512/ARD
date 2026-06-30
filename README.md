@@ -10,12 +10,16 @@ AI 에이전트(Alpha 등)의 도구·스킬·MCP를 자동으로 탐지·업그
 
 | 프로젝트 | 설명 | 상태 |
 |---------|------|------|
-| [Trend-Following-Youtube](./Trend-Following-Youtube/) | YouTube 모니터링 → 스킬/MCP 자동 설치. **⚠️ 현재는 RSS 텍스트 스크래퍼 — 영상 시청·이해 미구현. [비전 vs 현실](./Trend-Following-Youtube/VISION_VS_REALITY.md) 참조** | 🟡 Phase 1/4 |
-| [Claude-App-Factory](./Claude-App-Factory/) | Claude 중심 로컬 앱 빌딩 시스템 표준 아키텍처(MCP 신경망 + 설계→배포→측정 파이프라인) + 실행 가능 부트스트랩 | 📐 문서+스크립트 |
+| **[ard-loop](./ard-loop/)** ⭐ | **CAR 자율학습 루프(플래그십).** 유튜브 자막·깃허브 → CAR(임원 에이전트)이 보고·이해 → G2 적용·검증·보고·자가개선. HARVEST→UNDERSTAND→APPLY→VERIFY→REPORT→HEAL 6단계 | ✅ 코어 구현(Phase 2~3) |
+| [agents/CAR.md](./agents/CAR.md) | CAR 임원 에이전트 페르소나(ard-loop 소유자) | ✅ |
+| [Trend-Following-Youtube](./Trend-Following-Youtube/) | (레거시) RSS 텍스트 스크래퍼. ard-loop이 자막 기반으로 대체. [비전 vs 현실](./Trend-Following-Youtube/VISION_VS_REALITY.md) | 🟡 Phase 1 → ard-loop로 승계 |
+| [Claude-App-Factory](./Claude-App-Factory/) | Claude 중심 로컬 앱 빌딩 시스템 아키텍처 + 실행 부트스트랩 | 📐 문서+스크립트 |
 
 ---
 
 ## 프로젝트 철학
 
 > G2의 AI 팀은 스스로 업그레이드한다.
-> 사람이 매번 스킬을 찾아서 설치하는 대신, 시스템이 트렌드를 추적하고 자동 적용한다.
+> 사람이 매번 스킬을 찾아서 설치하는 대신, **CAR이 유튜브·깃허브의 바이럴 지식을 보고 이해해서** G2에 자동 적용·검증·보고한다.
+
+설치(회장 로컬 1회): `cd ard-loop/install && pwsh -File install.ps1`
