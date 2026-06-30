@@ -17,10 +17,13 @@ from pathlib import Path
 ARD_DIR = Path.home() / ".claude" / "ard"
 QUEUE_DIR = ARD_DIR / "queue"
 STATE_FILE = ARD_DIR / "state.json"
+GH_STATE_FILE = ARD_DIR / "github_state.json"
 DISPATCH_STATE = ARD_DIR / "dispatch_state.json"
 HARVESTER = ARD_DIR / "harvester" / "car_harvester.py"
+GH_HARVESTER = ARD_DIR / "harvester" / "car_github_harvester.py"
 NOTIFY_INTERVAL_HOURS = 20
-HARVEST_STALE_HOURS = 36
+HARVEST_STALE_HOURS = 36          # 유튜브(자막 느림) → 백그라운드
+GH_STALE_HOURS = 12               # 깃허브(빠름) → 세션 시작 시 인라인 즉시 확인
 
 
 def load(path, default):
@@ -49,16 +52,24 @@ def hours_since(iso):
         return None
 
 
-def maybe_wake_harvester():
-    """harvester가 오래 안 돌았으면 백그라운드로 1회 실행(비차단)."""
-    state = load(STATE_FILE, {})
-    age = hours_since(state.get("last_run"))
-    if (age is None or age > HARVEST_STALE_HOURS) and HARVESTER.exists():
+def maybe_wake_harvesters():
+    """노트북 켜고 세션 시작 시:
+       - 깃허브(빠름): stale하면 인라인 즉시 실행 → 큐가 '바로' 갱신됨(회장 요구).
+       - 유튜브(자막 느림): stale하면 백그라운드(비차단)."""
+    # 깃허브 인라인 (짧은 타임아웃, 막히면 포기하고 진행)
+    gh_age = hours_since(load(GH_STATE_FILE, {}).get("last_run"))
+    if (gh_age is None or gh_age > GH_STALE_HOURS) and GH_HARVESTER.exists():
         try:
-            subprocess.Popen(
-                [sys.executable, str(HARVESTER)],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            )
+            subprocess.run([sys.executable, str(GH_HARVESTER)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=25)
+        except Exception:
+            pass
+    # 유튜브 백그라운드
+    yt_age = hours_since(load(STATE_FILE, {}).get("last_run"))
+    if (yt_age is None or yt_age > HARVEST_STALE_HOURS) and HARVESTER.exists():
+        try:
+            subprocess.Popen([sys.executable, str(HARVESTER)],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass
 
@@ -71,11 +82,12 @@ def main():
         pass
 
     if not QUEUE_DIR.exists():
-        return 0
+        QUEUE_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 노트북 켜는 순간 깃허브를 바로 확인(인라인) + 유튜브 백그라운드
+    maybe_wake_harvesters()
 
     pending = [p for p in QUEUE_DIR.glob("*.json")]
-    maybe_wake_harvester()
-
     if not pending:
         return 0
 
@@ -85,19 +97,27 @@ def main():
     if age is not None and age < NOTIFY_INTERVAL_HOURS:
         return 0
 
-    titles = []
-    for p in pending[:5]:
+    yt, gh, titles = 0, 0, []
+    for p in pending:
         item = load(p, {})
-        titles.append(f"  - {item.get('channel','?')}: {item.get('title','?')}")
-    more = f"\n  ...외 {len(pending)-5}개" if len(pending) > 5 else ""
+        if item.get("source") == "github":
+            gh += 1
+        else:
+            yt += 1
+    for p in pending[:6]:
+        item = load(p, {})
+        tag = "📦GH" if item.get("source") == "github" else "🎬YT"
+        titles.append(f"  {tag} {item.get('channel','?')}: {item.get('title','?')}")
+    more = f"\n  ...외 {len(pending)-6}개" if len(pending) > 6 else ""
 
     msg = (
-        f"[ARD/CAR 자동 디스패치] 미처리 AI-에이전트 영상 자막 {len(pending)}개가 큐에 있습니다.\n"
+        f"[ARD/CAR 자동 디스패치] 미처리 AI-에이전트 지식 {len(pending)}건 "
+        f"(유튜브 {yt} · 깃허브 {gh})이 큐에 있습니다.\n"
         f"{chr(10).join(titles)}{more}\n"
         f"→ Alpha는 CAR 에이전트를 소환해 큐를 처리하세요: Agent(\"CAR\").\n"
         f"  큐 경로: {QUEUE_DIR}\n"
-        f"  처리 절차: 각 자막 이해 → docs/insights/ 인사이트 작성 → 신뢰출처만 자동적용/"
-        f"나머지 승인큐 → 적용물 검증 → docs/reports/ 다이제스트. (페르소나: ARD/agents/CAR.md)"
+        f"  처리 절차: 각 항목(자막/릴리스/레포) 이해 → docs/insights/ 작성 → 신뢰출처만 "
+        f"자동적용/나머지 승인큐 → 적용물 검증 → docs/reports/ 다이제스트. (페르소나: ARD/agents/CAR.md)"
     )
 
     # Claude Code SessionStart 컨텍스트 주입 형식 + 평문 폴백

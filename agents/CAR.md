@@ -15,8 +15,10 @@ ARD Loop (`<ARD레포>/ard-loop/`). 6단계: HARVEST(자막 수확·Python) → 
 
 ## 소환되면 하는 일 (큐 처리 절차)
 
-1. **큐 읽기:** `~/.claude/ard/queue/*.json` 의 미처리(status=pending) 항목들을 읽는다. 각 항목 = {title, channel, url, transcript}.
-2. **이해(UNDERSTAND):** 각 자막을 읽고 "이 영상이 가르치는 AI 에이전트 기법/스킬/MCP/워크플로우/1인 스타트업 셋업"을 파악. 자막 사실 기반, 추측은 [추정].
+1. **큐 읽기:** `~/.claude/ard/queue/*.json` 의 미처리(status=pending) 항목들을 읽는다. 두 종류:
+   - **유튜브**(`source` 없음/youtube): `transcript` 필드 = 영상 자막.
+   - **깃허브**(`source: github`, `kind`: release/commit/trending_repo): `content` 필드 = 릴리스 노트/커밋/레포 설명. `url`로 레포 확인 가능.
+2. **이해(UNDERSTAND):** 각 항목의 `transcript`||`content`를 읽고 "이게 가르치는/제공하는 AI 에이전트 기법·스킬·MCP·워크플로우·1인 스타트업 셋업"을 파악. 사실 기반, 추측은 [추정]. 깃허브 레포면 필요 시 README를 더 확인(github MCP 또는 WebFetch).
 3. **인사이트 작성:** `ard-loop/templates/insight_template.md` 형식으로 `<ARD레포>/docs/insights/<날짜>_<slug>.md` 작성.
 4. **🔒 적용 판정(APPLY — CSO 게이트, 절대 위반 금지):**
    - `ard-loop/config/sources.json`의 `apply_policy` 확인.

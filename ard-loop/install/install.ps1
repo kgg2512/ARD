@@ -27,9 +27,10 @@ foreach ($d in @($ardOps, (Join-Path $ardOps 'config'), (Join-Path $ardOps 'queu
 }
 
 # 2) 스크립트·설정 비치
-Copy-Item (Join-Path $loop 'config\sources.json')          (Join-Path $ardOps 'config\sources.json') -Force
-Copy-Item (Join-Path $loop 'harvester\car_harvester.py')   (Join-Path $ardOps 'harvester\car_harvester.py') -Force
-Copy-Item (Join-Path $loop 'hooks\car_dispatch.py')        (Join-Path $ardOps 'hooks\car_dispatch.py') -Force
+Copy-Item (Join-Path $loop 'config\sources.json')              (Join-Path $ardOps 'config\sources.json') -Force
+Copy-Item (Join-Path $loop 'harvester\car_harvester.py')       (Join-Path $ardOps 'harvester\car_harvester.py') -Force
+Copy-Item (Join-Path $loop 'harvester\car_github_harvester.py') (Join-Path $ardOps 'harvester\car_github_harvester.py') -Force
+Copy-Item (Join-Path $loop 'hooks\car_dispatch.py')            (Join-Path $ardOps 'hooks\car_dispatch.py') -Force
 Copy-Item (Join-Path $loop 'hooks\car_supervisor.py')      (Join-Path $ardOps 'hooks\car_supervisor.py') -Force
 Copy-Item (Join-Path $loop 'hooks\car_dispatch.py')        (Join-Path $hooksDir 'car_dispatch.py') -Force
 Copy-Item (Join-Path $repoRoot 'agents\CAR.md')            (Join-Path $agentsDir 'car.md') -Force
@@ -41,13 +42,16 @@ Write-Host "  youtube-transcript-api 설치 중..." -ForegroundColor Cyan
 if ($LASTEXITCODE -eq 0) { Write-Host "  ✅ youtube-transcript-api" -ForegroundColor Green }
 else { Write-Host "  ⚠️ pip 실패 — 수동: $pyExe -m pip install youtube-transcript-api" -ForegroundColor Yellow }
 
-# 4) Task Scheduler 등록 (harvester 일 1회 / supervisor 주 1회)
+# 4) Task Scheduler 등록 (유튜브 일 / 깃허브 일 / supervisor 주). 로그온 시에도 트리거.
 $harvPath = Join-Path $ardOps 'harvester\car_harvester.py'
+$ghPath   = Join-Path $ardOps 'harvester\car_github_harvester.py'
 $supPath  = Join-Path $ardOps 'hooks\car_supervisor.py'
 try {
     schtasks /Create /F /SC DAILY  /ST 09:00 /TN "G2-ARD-Harvester"  /TR "`"$pyExe`" `"$harvPath`"" | Out-Null
+    schtasks /Create /F /SC DAILY  /ST 09:15 /TN "G2-ARD-GitHub"     /TR "`"$pyExe`" `"$ghPath`"" | Out-Null
+    schtasks /Create /F /SC ONLOGON          /TN "G2-ARD-GitHub-Logon" /TR "`"$pyExe`" `"$ghPath`"" | Out-Null
     schtasks /Create /F /SC WEEKLY /D MON /ST 09:30 /TN "G2-ARD-Supervisor" /TR "`"$pyExe`" `"$supPath`"" | Out-Null
-    Write-Host "  ✅ Task Scheduler: G2-ARD-Harvester(일 09:00) · G2-ARD-Supervisor(월 09:30)" -ForegroundColor Green
+    Write-Host "  ✅ Task Scheduler: Harvester(일 09:00)·GitHub(일 09:15 +로그온)·Supervisor(월 09:30)" -ForegroundColor Green
 } catch {
     Write-Host "  ⚠️ Task Scheduler 등록 실패(관리자 권한 필요할 수 있음). 수동 등록 안내는 README 참조." -ForegroundColor Yellow
 }
@@ -74,9 +78,12 @@ try {
     Write-Host "     command: $cmd" -ForegroundColor Yellow
 }
 
-# 6) 스모크 실행 (자막이 실제로 쌓이는지)
-Write-Host "  harvester 1회 실행(스모크)..." -ForegroundColor Cyan
+# 6) 스모크 실행 (깃허브·유튜브가 실제로 쌓이는지)
+Write-Host "  GitHub 수확 1회 실행(스모크)..." -ForegroundColor Cyan
+& $pyExe $ghPath --force
+Write-Host "  YouTube 수확 1회 실행(스모크)..." -ForegroundColor Cyan
 & $pyExe $harvPath --force --limit 2
 Write-Host ""
-Write-Host "✅ 설치 완료. 다음 세션부터 큐가 차면 Alpha가 CAR을 자동 소환합니다." -ForegroundColor Green
-Write-Host "   수동 확인:  $pyExe `"$harvPath`" --force   /   큐: $ardOps\queue" -ForegroundColor DarkGray
+Write-Host "✅ 설치 완료. 노트북 켤 때(로그온)·세션 시작 시 깃허브를 바로 확인하고," -ForegroundColor Green
+Write-Host "   큐가 차면 Alpha가 CAR을 자동 소환합니다." -ForegroundColor Green
+Write-Host "   수동 확인:  $pyExe `"$ghPath`" --force   /   큐: $ardOps\queue" -ForegroundColor DarkGray

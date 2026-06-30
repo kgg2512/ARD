@@ -19,13 +19,29 @@
     { "name": "Liam Ottley",    "channel_id": "UCui4jxDaMb53Gdh-AZUTPAg", "handle": "@LiamOttley",   "priority": "low",    "active": true, "note": "AI 에이전트 자동화 비즈니스" }
   ],
   "github": {
-    "_comment": "Phase 2b: 릴리스/awesome 목록 추적. CAR이 신규 스킬/MCP 후보 발굴. 토큰 없이 공개 API 사용.",
+    "_comment": "릴리스/커밋 추적 + 트렌딩 검색. CAR이 신규 스킬/MCP/에이전트 후보 발굴. GITHUB_TOKEN 있으면 rate↑(없어도 60/h 동작).",
+    "active": true,
+    "interval_hours": 12,
     "watch_repos": [
       "modelcontextprotocol/servers",
       "anthropics/claude-code",
-      "punkpeye/awesome-mcp-servers"
+      "anthropics/anthropic-cookbook",
+      "punkpeye/awesome-mcp-servers",
+      "f/awesome-chatgpt-prompts"
     ],
-    "active": false
+    "search": {
+      "active": true,
+      "min_stars": 200,
+      "recent_days": 30,
+      "max_results": 8,
+      "queries": [
+        "claude code mcp",
+        "mcp server",
+        "ai agent orchestration",
+        "claude agent skill",
+        "solo founder ai automation"
+      ]
+    }
   },
   "apply_policy": {
     "_comment": "🔒 CSO 게이트: 아래 출처 + 설치수 1K+ 만 자동적용. 그 외는 회장 승인 큐.",

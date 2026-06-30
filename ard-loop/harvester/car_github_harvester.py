@@ -1,0 +1,225 @@
+#!/usr/bin/env python3
+"""
+CAR GitHub Harvester — ARD 자율학습 루프 HARVEST(깃허브 갈래).
+
+AI 에이전트/MCP/스킬 생태계의 깃허브 신호를 수집해 큐에 적재한다:
+  1. watch_repos 의 신규 릴리스(또는 최신 커밋) — claude-code·MCP 서버 등 업데이트
+  2. search 쿼리로 트렌딩 신규 레포 — 새 MCP/스킬/에이전트 프레임워크 발굴
+유튜브 갈래와 같은 큐로 흘러 CAR(Claude)가 이해·적용을 결정한다.
+LLM 비호출(저비용). 토큰 있으면(GITHUB_TOKEN/GH_TOKEN) rate limit↑, 없어도 동작(60/h).
+
+실행:
+    python car_github_harvester.py            # 12h 게이트
+    python car_github_harvester.py --force
+"""
+import argparse
+import json
+import os
+import sys
+import urllib.request
+import urllib.error
+import urllib.parse
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+ARD_DIR = Path.home() / ".claude" / "ard"
+CONFIG_FILE = ARD_DIR / "config" / "sources.json"
+QUEUE_DIR = ARD_DIR / "queue"
+STATE_FILE = ARD_DIR / "github_state.json"
+LOG_FILE = ARD_DIR / "harvester.log.jsonl"
+API = "https://api.github.com"
+DEFAULT_INTERVAL_HOURS = 12
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def log(event, **kw):
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"ts": now_iso(), "event": event, **kw}, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def load_json(path, default):
+    try:
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        log("load_error", path=str(path), error=str(e))
+    return default
+
+
+def save_json(path, obj):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def gh_get(url):
+    headers = {
+        "User-Agent": "G2-CAR-Harvester",
+        "Accept": "application/vnd.github+json",
+    }
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read().decode("utf-8", errors="ignore")), None
+    except urllib.error.HTTPError as e:
+        return None, f"HTTP {e.code}"
+    except Exception as e:
+        return None, str(e)
+
+
+def should_run(state, interval_hours, force):
+    if force:
+        return True
+    last = state.get("last_run")
+    if not last:
+        return True
+    try:
+        return datetime.now(timezone.utc) - datetime.fromisoformat(last) > timedelta(hours=interval_hours)
+    except Exception:
+        return True
+
+
+def harvest_releases(repo, seen_releases, harvested):
+    """watch_repo의 신규 릴리스(없으면 최신 커밋) 감지."""
+    data, err = gh_get(f"{API}/repos/{repo}/releases/latest")
+    if data and data.get("tag_name"):
+        tag = data["tag_name"]
+        if seen_releases.get(repo) == tag:
+            return
+        seen_releases[repo] = tag
+        item = {
+            "id": f"gh-rel-{repo.replace('/', '-')}-{tag}",
+            "source": "github",
+            "kind": "release",
+            "title": f"{repo} {tag} 릴리스",
+            "channel": "GitHub",
+            "url": data.get("html_url", f"https://github.com/{repo}/releases"),
+            "published": data.get("published_at", ""),
+            "harvested_at": now_iso(),
+            "status": "pending",
+            "content": (data.get("body") or "")[:6000],
+        }
+        save_json(QUEUE_DIR / f"{item['id']}.json", item)
+        harvested.append(item["id"])
+        log("gh_release", repo=repo, tag=tag)
+        return
+    # 릴리스 없음 → 최신 커밋 메시지로 대체(가벼운 변화 신호)
+    commits, _ = gh_get(f"{API}/repos/{repo}/commits?per_page=1")
+    if commits and isinstance(commits, list) and commits:
+        sha = commits[0].get("sha", "")[:7]
+        key = f"commit:{sha}"
+        if seen_releases.get(repo) == key:
+            return
+        seen_releases[repo] = key
+        msg = commits[0].get("commit", {}).get("message", "")
+        item = {
+            "id": f"gh-com-{repo.replace('/', '-')}-{sha}",
+            "source": "github",
+            "kind": "commit",
+            "title": f"{repo} 최신 커밋 {sha}",
+            "channel": "GitHub",
+            "url": f"https://github.com/{repo}/commit/{sha}",
+            "published": commits[0].get("commit", {}).get("author", {}).get("date", ""),
+            "harvested_at": now_iso(),
+            "status": "pending",
+            "content": msg[:2000],
+        }
+        save_json(QUEUE_DIR / f"{item['id']}.json", item)
+        harvested.append(item["id"])
+        log("gh_commit", repo=repo, sha=sha)
+
+
+def harvest_search(query, min_stars, days, seen_repos, harvested, max_results):
+    """트렌딩/신규 레포 발굴."""
+    q = urllib.parse.quote(query)
+    data, err = gh_get(f"{API}/search/repositories?q={q}&sort=stars&order=desc&per_page={max_results}")
+    if not data or "items" not in data:
+        log("gh_search_fail", query=query, error=err)
+        return
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    for repo in data["items"]:
+        full = repo.get("full_name", "")
+        if not full or full in seen_repos:
+            continue
+        if repo.get("stargazers_count", 0) < min_stars:
+            continue
+        pushed = repo.get("pushed_at", "")
+        try:
+            if pushed and datetime.fromisoformat(pushed.replace("Z", "+00:00")) < cutoff:
+                continue
+        except Exception:
+            pass
+        seen_repos.append(full)
+        item = {
+            "id": f"gh-repo-{full.replace('/', '-')}",
+            "source": "github",
+            "kind": "trending_repo",
+            "title": f"신규/트렌딩 레포: {full} (⭐{repo.get('stargazers_count', 0)})",
+            "channel": "GitHub Search",
+            "url": repo.get("html_url", ""),
+            "published": pushed,
+            "harvested_at": now_iso(),
+            "status": "pending",
+            "content": f"{repo.get('description', '')}\n\nstars: {repo.get('stargazers_count', 0)} | "
+                       f"language: {repo.get('language', '')} | query: {query}",
+        }
+        save_json(QUEUE_DIR / f"{item['id']}.json", item)
+        harvested.append(item["id"])
+        log("gh_trending", repo=full, stars=repo.get("stargazers_count", 0))
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--force", action="store_true")
+    args = ap.parse_args()
+
+    ARD_DIR.mkdir(parents=True, exist_ok=True)
+    QUEUE_DIR.mkdir(parents=True, exist_ok=True)
+
+    config = load_json(CONFIG_FILE, {})
+    gh = config.get("github", {})
+    if not gh.get("active", False):
+        print("[CAR GitHub] github.active=false — 건너뜀 (sources.json에서 활성화)")
+        return 0
+
+    interval = gh.get("interval_hours", DEFAULT_INTERVAL_HOURS)
+    state = load_json(STATE_FILE, {"last_run": None, "seen_releases": {}, "seen_repos": []})
+    if not should_run(state, interval, args.force):
+        return 0
+
+    seen_releases = state.get("seen_releases", {})
+    seen_repos = state.get("seen_repos", [])
+    harvested = []
+
+    for repo in gh.get("watch_repos", []):
+        harvest_releases(repo, seen_releases, harvested)
+
+    search_cfg = gh.get("search", {})
+    if search_cfg.get("active", True):
+        min_stars = search_cfg.get("min_stars", 200)
+        days = search_cfg.get("recent_days", 30)
+        max_results = search_cfg.get("max_results", 8)
+        for query in search_cfg.get("queries", []):
+            harvest_search(query, min_stars, days, seen_repos, harvested, max_results)
+
+    state["last_run"] = now_iso()
+    state["seen_releases"] = seen_releases
+    state["seen_repos"] = seen_repos[-500:]
+    save_json(STATE_FILE, state)
+
+    pending = len(list(QUEUE_DIR.glob("*.json")))
+    log("gh_run_complete", harvested=len(harvested), queue_pending=pending)
+    print(f"[CAR GitHub] 신규 {len(harvested)}건 수확 · 큐 대기 {pending}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
