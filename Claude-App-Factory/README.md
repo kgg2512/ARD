@@ -88,7 +88,7 @@
 **Conductor는 Mac 전용 앱이라 회장은 못 쓴다.** (회장 환경 = Windows / PowerShell 5.1 — G2 CLAUDE.md 기준 [확인])
 하지만 Conductor가 하는 일(= 여러 Claude 에이전트를 격리된 repo 복사본에서 병렬 구동)은 **Windows에서도 그대로 재현 가능**하다. Conductor는 git worktree 위에 입힌 GUI 껍데기일 뿐이기 때문.
 
-→ Windows 대안과 재현 방법은 [STACK_MAPPING.md](./STACK_MAPPING.md) §"Conductor 대체" 참조.
+→ Windows 대안 설명은 [STACK_MAPPING.md](./STACK_MAPPING.md) §"Conductor 대체", **실제 적용 스크립트는 [bootstrap/](./bootstrap/)** (`bootstrap.ps1` 실행 → `wtnew`/`wtmerge` 명령 즉시 사용).
 
 ---
 
@@ -99,6 +99,7 @@
 | `README.md` (이 파일) | 전체 아키텍처·철학·파이프라인 |
 | [`STACK_MAPPING.md`](./STACK_MAPPING.md) | 사진 스택 ↔ 회장 현재 G2 MCP 스택 1:1 매핑 + Windows 대안 |
 | [`SETUP_LOCAL.md`](./SETUP_LOCAL.md) | 로컬 노트북에 처음부터 설치하는 단계별 체크리스트 |
+| [`bootstrap/`](./bootstrap/) | **실행 가능한 자동 설치.** `bootstrap.ps1` 한 번 → git worktree(Conductor 대체) + PostHog 주입기가 노트북에 적용 |
 
 ---
 
