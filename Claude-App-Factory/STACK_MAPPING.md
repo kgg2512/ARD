@@ -10,7 +10,7 @@
 | 공정 | 사진 도구 | 회장 G2 현재 대응 | 상태 | 액션 |
 |------|----------|------------------|------|------|
 | 두뇌 | Claude Code | Claude Code (Alpha 운영체제) | ✅ 동일·가동 중 | 없음 |
-| 설계 | Dribbble | **Stitch MCP** + **Figma MCP** + `ui-ux-pro-max` 스킬 | ✅ 더 강력 | Dribbble은 영감용 웹열람만, 실제 생성은 Stitch/Figma |
+| 설계 | Dribbble | **Stitch MCP** + **Figma MCP** + `ui-ux-pro-max` 스킬 | ✅ 더 강력 | **Dribbble = MCP 없음(6개 중 유일).** 순수 사람 눈 영감용. 자동화 디자인은 Stitch/Figma MCP가 담당 |
 | 병렬 빌드 | Conductor (Mac) | git worktree 병렬 (G2 CLAUDE.md에 이미 규정) | ⚠️ 도구는 없음, 기법은 있음 | §3 Windows 대안 |
 | 백엔드 | Supabase | **supabase MCP** | ✅ 동일·연결됨 | 그냥 쓰면 됨 |
 | 배포 | Vercel | **vercel MCP** | ✅ 동일·연결됨 | 그냥 쓰면 됨 |
