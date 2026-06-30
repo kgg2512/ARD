@@ -20,10 +20,19 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+# 한글 출력이 cp949 콘솔(회장 PC 기본)에서 크래시하지 않도록 stdout/stderr를 UTF-8로 강제.
+# (em-dash 등 cp949 미매핑 문자에서 UnicodeEncodeError로 훅이 죽는 함정 방어.)
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 ARD_DIR = Path.home() / ".claude" / "ard"
 QUEUE_DIR = ARD_DIR / "queue"
 STATE_FILE = ARD_DIR / "state.json"
 APPLIED_FILE = ARD_DIR / "applied.json"          # CAR이 적용할 때마다 기록하는 원장
+ORG_STATE_FILE = ARD_DIR / "org_state.json"      # 조직 리뷰 주기 상태 (OrgDev 트랙)
 REPORTS_DIR = ARD_DIR / "reports"
 HARVESTER = ARD_DIR / "harvester" / "car_harvester.py"
 SKILL_USAGE = Path.home() / ".claude" / "skill_usage.jsonl"   # G2 기존 사용 신호
@@ -31,6 +40,7 @@ SKILL_USAGE = Path.home() / ".claude" / "skill_usage.jsonl"   # G2 기존 사용
 HARVEST_STALE_HOURS = 48
 QUEUE_BACKLOG_WARN = 15
 ADOPTION_GRACE_DAYS = 7
+ORG_REVIEW_DAYS = 21             # 조직 리뷰 주기 — N일 지나면 CAR 조직 리뷰 촉구
 
 
 def load(path, default):
@@ -122,12 +132,34 @@ def check_adoption(findings):
     return {"checked": len(items), "unused": unused}
 
 
+def check_org_review(findings):
+    """조직 트랙(OrgDev): 마지막 조직 리뷰가 ORG_REVIEW_DAYS 지났으면 due 플래그.
+    → dispatch가 SessionStart에 'CAR 소환해 조직 리뷰'를 surface. 도구 큐와 독립."""
+    org = load(ORG_STATE_FILE, {})
+    age_h = hours_since(org.get("last_review"))
+    due = age_h is None or age_h > ORG_REVIEW_DAYS * 24
+    if due:
+        when = "한 번도 없음" if age_h is None else f"{age_h/24:.0f}일 전"
+        findings.append(("WARN", "org_review",
+                         f"마지막 조직 리뷰 {when} (주기 {ORG_REVIEW_DAYS}일) → CAR 조직 리뷰 촉구"))
+    else:
+        findings.append(("OK", "org_review", f"마지막 조직 리뷰 {age_h/24:.0f}일 전"))
+    org["due"] = due
+    try:
+        ORG_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        ORG_STATE_FILE.write_text(json.dumps(org, indent=2, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+    return due
+
+
 def main():
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     findings = []
     harvester_status = check_harvester(findings)
     pending = check_queue(findings)
     adoption = check_adoption(findings)
+    org_review_due = check_org_review(findings)
 
     has_fail = any(f[0] == "FAIL" for f in findings)
     has_warn = any(f[0] == "WARN" for f in findings)
@@ -139,6 +171,7 @@ def main():
         "harvester_status": harvester_status,
         "queue_pending": pending,
         "adoption": adoption,
+        "org_review_due": org_review_due,
         "findings": [{"level": l, "area": a, "detail": d} for (l, a, d) in findings],
     }
     date = datetime.now(timezone.utc).strftime("%Y%m%d")

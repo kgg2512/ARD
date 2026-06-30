@@ -14,11 +14,20 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+# 한글 출력이 cp949 콘솔(회장 PC 기본)에서 크래시하지 않도록 stdout/stderr를 UTF-8로 강제.
+# (em-dash 등 cp949 미매핑 문자에서 UnicodeEncodeError로 SessionStart 훅이 죽는 함정 방어.)
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 ARD_DIR = Path.home() / ".claude" / "ard"
 QUEUE_DIR = ARD_DIR / "queue"
 STATE_FILE = ARD_DIR / "state.json"
 GH_STATE_FILE = ARD_DIR / "github_state.json"
 DISPATCH_STATE = ARD_DIR / "dispatch_state.json"
+ORG_STATE_FILE = ARD_DIR / "org_state.json"       # 조직 리뷰 주기 (supervisor가 due 세움)
 NOTICES_FILE = ARD_DIR / "notices.jsonl"
 HARVESTER = ARD_DIR / "harvester" / "car_harvester.py"
 GH_HARVESTER = ARD_DIR / "harvester" / "car_github_harvester.py"
@@ -142,6 +151,20 @@ def main():
     dstate = load(DISPATCH_STATE, {})
     age = hours_since(dstate.get("last_notify"))
     queue_due = pending and (age is None or age >= NOTIFY_INTERVAL_HOURS)
+
+    # (C) 조직 리뷰 — supervisor가 due 세움. 도구 큐와 독립으로 발화(하루 1회 게이트).
+    org = load(ORG_STATE_FILE, {})
+    org_notify_age = hours_since(org.get("last_org_notify"))
+    org_due = bool(org.get("due")) and (org_notify_age is None or org_notify_age >= NOTIFY_INTERVAL_HOURS)
+    if org_due:
+        sections.append(
+            "[ARD/CAR 조직 리뷰] 조직 리뷰 주기 도래 — G2 조직을 베스트프랙티스와 대조할 시점.\n"
+            "→ Alpha는 CAR 소환해 조직 리뷰: Agent(\"CAR\") + \"조직 리뷰\".\n"
+            "  절차: docs/G2_ORG_STRUCTURE.md 읽기 → 갭 분석(교육·개발·개선) "
+            "→ docs/org_proposals/ 제안서(propose-only) → 회장 승인 → Alpha 반영. (ARD/agents/CAR.md)"
+        )
+        org["last_org_notify"] = datetime.now(timezone.utc).isoformat()
+        save(ORG_STATE_FILE, org)
 
     if not sections and not queue_due:
         return 0
