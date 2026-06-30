@@ -40,7 +40,7 @@ SKILL_USAGE = Path.home() / ".claude" / "skill_usage.jsonl"   # G2 기존 사용
 HARVEST_STALE_HOURS = 48
 QUEUE_BACKLOG_WARN = 15
 ADOPTION_GRACE_DAYS = 7
-ORG_REVIEW_DAYS = 21             # 조직 리뷰 주기 — N일 지나면 CAR 조직 리뷰 촉구
+ORG_REVIEW_DAYS = 7              # 조직 리뷰 주기 — N일 지나면 CAR 조직 리뷰 촉구 (큐레이터 7일과 정합)
 
 
 def load(path, default):
