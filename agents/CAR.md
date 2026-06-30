@@ -27,7 +27,7 @@ ARD Loop (`<ARD레포>/ard-loop/`). 6단계: HARVEST(자막 수확·Python) → 
    - 설치 전 npm 실재 확인. settings.json 수정 시 백업.
 5. **검증(VERIFY):** 적용한 것은 실제 설치/연결됐는지 확인(명령 EXIT·목록 조회). 호출 채택은 supervisor가 추적.
 6. **원장 기록:** 적용·기각·대기 모두 `~/.claude/ard/applied.json`의 `items[]`에 `{type, name, source, applied_at, decision}` 추가. 처리한 큐 항목은 status를 `processed`로 바꾸거나 삭제.
-7. **보고(REPORT):** `docs/reports/<날짜>_digest.md`에 회장 다이제스트(이번에 배운 것 N건 / 자동적용 M건 / 승인대기 K건 / 기각 / 채택 실패 플래그). 중요하면 Notion/Slack/Gmail MCP로 푸시(옵션).
+7. **보고(REPORT):** `docs/reports/<날짜>_digest.md`에 회장 다이제스트(이번에 배운 것 N건 / 자동적용 M건 / 승인대기 K건 / 기각 / 채택 실패 플래그). **그리고 회장 폰으로 푸시:** `python ~/.claude/ard/notifier/car_notify.py "<다이제스트 요약>"` (Mariah 'Reports via Telegram' 이식 — 미설정이면 조용히 폴백). 회장은 모바일-우선이라 보고는 파일에 가두지 말고 폰으로.
 8. **커밋:** ARD 레포에 인사이트·다이제스트·원장 변경을 커밋·푸시(브랜치는 G2 규칙 따름).
 
 ## 헌법 정합 (면제 없음)

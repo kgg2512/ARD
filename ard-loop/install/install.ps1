@@ -33,8 +33,26 @@ Copy-Item (Join-Path $loop 'harvester\car_github_harvester.py') (Join-Path $ardO
 Copy-Item (Join-Path $loop 'hooks\car_dispatch.py')            (Join-Path $ardOps 'hooks\car_dispatch.py') -Force
 Copy-Item (Join-Path $loop 'hooks\car_supervisor.py')      (Join-Path $ardOps 'hooks\car_supervisor.py') -Force
 Copy-Item (Join-Path $loop 'hooks\car_dispatch.py')        (Join-Path $hooksDir 'car_dispatch.py') -Force
+New-Item -ItemType Directory -Force -Path (Join-Path $ardOps 'notifier') | Out-Null
+Copy-Item (Join-Path $loop 'notifier\car_notify.py')       (Join-Path $ardOps 'notifier\car_notify.py') -Force
 Copy-Item (Join-Path $repoRoot 'agents\CAR.md')            (Join-Path $agentsDir 'car.md') -Force
 Write-Host "  비치: $ardOps, CAR 에이전트 → $agentsDir\car.md" -ForegroundColor Green
+
+# 일회성 공지 seed — 노트북 켤 때 dispatch가 회장께 surface (max_shows회)
+$notice = @{
+    id = "yt-setup-and-verify"
+    max_shows = 5
+    shown = 0
+    text = ("유튜브 갈래는 회장이 직접 셋업하기로 함 — 리마인드: ① 회장 로컬에서 video-reading 스킬/유튜브 채널 확정. " +
+            "② 설치 검증 필수: (a) python <ARD ops>\harvester\car_github_harvester.py --force 로 깃허브 큐 쌓이나, " +
+            "(b) python ...\car_harvester.py --force 로 유튜브 자막 쌓이나, (c) schtasks /query /TN G2-ARD-GitHub 로 스케줄 등록됐나, " +
+            "(d) settings.json SessionStart에 car_dispatch 들어갔나(.bak 백업 확인). 이상 시 Alpha에게 보고.")
+} | ConvertTo-Json -Compress
+$noticesFile = Join-Path $ardOps 'notices.jsonl'
+if (-not (Test-Path $noticesFile) -or -not (Select-String -Path $noticesFile -SimpleMatch 'yt-setup-and-verify' -Quiet)) {
+    Add-Content -Path $noticesFile -Value $notice -Encoding UTF8
+    Write-Host "  공지 seed: 다음 세션부터 회장께 리마인드" -ForegroundColor Green
+}
 
 # 3) 자막 라이브러리 설치
 Write-Host "  youtube-transcript-api 설치 중..." -ForegroundColor Cyan

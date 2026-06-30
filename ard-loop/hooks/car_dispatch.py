@@ -19,6 +19,7 @@ QUEUE_DIR = ARD_DIR / "queue"
 STATE_FILE = ARD_DIR / "state.json"
 GH_STATE_FILE = ARD_DIR / "github_state.json"
 DISPATCH_STATE = ARD_DIR / "dispatch_state.json"
+NOTICES_FILE = ARD_DIR / "notices.jsonl"
 HARVESTER = ARD_DIR / "harvester" / "car_harvester.py"
 GH_HARVESTER = ARD_DIR / "harvester" / "car_github_harvester.py"
 NOTIFY_INTERVAL_HOURS = 20
@@ -50,6 +51,47 @@ def hours_since(iso):
         return (datetime.now(timezone.utc) - datetime.fromisoformat(iso)).total_seconds() / 3600
     except Exception:
         return None
+
+
+def read_notices():
+    """노트북 켤 때마다 surface할 일회성 공지(설치 시 seed). max_shows까지 반복 후 종료."""
+    if not NOTICES_FILE.exists():
+        return []
+    lines, out = [], []
+    try:
+        raw = NOTICES_FILE.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return []
+    for ln in raw:
+        ln = ln.strip()
+        if not ln:
+            continue
+        try:
+            n = json.loads(ln)
+        except Exception:
+            continue
+        shown = n.get("shown", 0)
+        maxs = n.get("max_shows", 3)
+        if shown < maxs:
+            out.append(n.get("text", ""))
+            n["shown"] = shown + 1
+        lines.append(n)
+    try:
+        NOTICES_FILE.write_text(
+            "\n".join(json.dumps(n, ensure_ascii=False) for n in lines), encoding="utf-8")
+    except Exception:
+        pass
+    return [t for t in out if t]
+
+
+def try_push(text):
+    """설치된 car_notify로 텔레그램 푸시 시도(미설정이면 조용히 무시)."""
+    try:
+        sys.path.insert(0, str(ARD_DIR / "notifier"))
+        import car_notify
+        return car_notify.push(text)
+    except Exception:
+        return False
 
 
 def maybe_wake_harvesters():
@@ -87,51 +129,56 @@ def main():
     # 노트북 켜는 순간 깃허브를 바로 확인(인라인) + 유튜브 백그라운드
     maybe_wake_harvesters()
 
-    pending = [p for p in QUEUE_DIR.glob("*.json")]
-    if not pending:
-        return 0
+    sections = []
 
-    # 하루 1회만 알림
+    # (A) 일회성 공지 — 노트북 켤 때마다(max_shows까지) 무조건 surface
+    notices = read_notices()
+    if notices:
+        sections.append("📌 [회장 공지]\n" + "\n\n".join(notices))
+
+    pending = [p for p in QUEUE_DIR.glob("*.json")]
+
+    # (B) 큐 요약 — 하루 1회 게이트
     dstate = load(DISPATCH_STATE, {})
     age = hours_since(dstate.get("last_notify"))
-    if age is not None and age < NOTIFY_INTERVAL_HOURS:
+    queue_due = pending and (age is None or age >= NOTIFY_INTERVAL_HOURS)
+
+    if not sections and not queue_due:
         return 0
 
-    yt, gh, titles = 0, 0, []
-    for p in pending:
-        item = load(p, {})
-        if item.get("source") == "github":
-            gh += 1
-        else:
-            yt += 1
-    for p in pending[:6]:
-        item = load(p, {})
-        tag = "📦GH" if item.get("source") == "github" else "🎬YT"
-        titles.append(f"  {tag} {item.get('channel','?')}: {item.get('title','?')}")
-    more = f"\n  ...외 {len(pending)-6}개" if len(pending) > 6 else ""
+    if queue_due:
+        yt, gh, titles = 0, 0, []
+        for p in pending:
+            item = load(p, {})
+            if item.get("source") == "github":
+                gh += 1
+            else:
+                yt += 1
+        for p in pending[:6]:
+            item = load(p, {})
+            tag = "📦GH" if item.get("source") == "github" else "🎬YT"
+            titles.append(f"  {tag} {item.get('channel','?')}: {item.get('title','?')}")
+        more = f"\n  ...외 {len(pending)-6}개" if len(pending) > 6 else ""
+        sections.append(
+            f"[ARD/CAR 디스패치] 미처리 AI-에이전트 지식 {len(pending)}건 "
+            f"(유튜브 {yt} · 깃허브 {gh}):\n"
+            f"{chr(10).join(titles)}{more}\n"
+            f"→ Alpha는 CAR 소환해 처리: Agent(\"CAR\"). 큐: {QUEUE_DIR}\n"
+            f"  절차: 각 항목 이해 → docs/insights/ → 신뢰출처만 자동적용/나머지 승인큐 "
+            f"→ 검증 → docs/reports/ 다이제스트. (ARD/agents/CAR.md)"
+        )
+        dstate["last_notify"] = datetime.now(timezone.utc).isoformat()
+        dstate["last_pending"] = len(pending)
+        save(DISPATCH_STATE, dstate)
 
-    msg = (
-        f"[ARD/CAR 자동 디스패치] 미처리 AI-에이전트 지식 {len(pending)}건 "
-        f"(유튜브 {yt} · 깃허브 {gh})이 큐에 있습니다.\n"
-        f"{chr(10).join(titles)}{more}\n"
-        f"→ Alpha는 CAR 에이전트를 소환해 큐를 처리하세요: Agent(\"CAR\").\n"
-        f"  큐 경로: {QUEUE_DIR}\n"
-        f"  처리 절차: 각 항목(자막/릴리스/레포) 이해 → docs/insights/ 작성 → 신뢰출처만 "
-        f"자동적용/나머지 승인큐 → 적용물 검증 → docs/reports/ 다이제스트. (페르소나: ARD/agents/CAR.md)"
-    )
+    msg = "\n\n".join(sections)
 
-    # Claude Code SessionStart 컨텍스트 주입 형식 + 평문 폴백
-    out = {
-        "hookSpecificOutput": {
-            "hookEventName": "SessionStart",
-            "additionalContext": msg,
-        }
-    }
+    # 모바일 푸시(Telegram, 설정 시) — Mariah 'Reports via Telegram' 이식
+    try_push(msg)
+
+    # Claude Code SessionStart 컨텍스트 주입
+    out = {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": msg}}
     print(json.dumps(out, ensure_ascii=False))
-
-    dstate["last_notify"] = datetime.now(timezone.utc).isoformat()
-    dstate["last_pending"] = len(pending)
-    save(DISPATCH_STATE, dstate)
     return 0
 
 

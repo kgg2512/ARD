@@ -148,14 +148,22 @@ def main():
     except Exception:
         pass
 
-    # 회장 다이제스트 (GREEN이면 조용히, YELLOW/RED만 출력)
+    # 회장 다이제스트 (GREEN이면 조용히, YELLOW/RED만 출력 + 폰 푸시)
     if health != "GREEN":
         lines = [f"[ARD/CAR 감독] 건강도: {health}"]
         for (l, a, d) in findings:
             if l != "OK":
                 lines.append(f"  [{l}] {a}: {d}")
         lines.append("→ Alpha/CAR 후속 조치 필요.")
-        print("\n".join(lines))
+        digest = "\n".join(lines)
+        print(digest)
+        # Telegram 푸시(설정 시) — Mariah 'Reports via Telegram' 이식
+        try:
+            sys.path.insert(0, str(ARD_DIR / "notifier"))
+            import car_notify
+            car_notify.push(digest)
+        except Exception:
+            pass
     return 0
 
 

@@ -43,6 +43,12 @@
       ]
     }
   },
+  "reporting": {
+    "_comment": "Mariah 'Reports via Telegram' 이식. 토큰은 환경변수(ARD_TELEGRAM_TOKEN/CHAT_ID), 레포에 키 금지.",
+    "channel": "telegram",
+    "push_on": ["supervisor_yellow_red", "car_digest"],
+    "fallback": "session_context_and_file"
+  },
   "apply_policy": {
     "_comment": "🔒 CSO 게이트: 아래 출처 + 설치수 1K+ 만 자동적용. 그 외는 회장 승인 큐.",
     "trusted_publishers": [
