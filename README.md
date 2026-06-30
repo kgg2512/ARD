@@ -13,6 +13,7 @@ AI 에이전트(Alpha 등)의 도구·스킬·MCP를 자동으로 탐지·업그
 | **[ard-loop](./ard-loop/)** ⭐ | **CAR 자율학습 루프(플래그십).** 유튜브 자막·깃허브 → CAR(임원 에이전트)이 보고·이해 → G2 적용·검증·보고·자가개선. HARVEST→UNDERSTAND→APPLY→VERIFY→REPORT→HEAL 6단계 | ✅ 코어 구현(Phase 2~3) |
 | [agents/CAR.md](./agents/CAR.md) | CAR 임원 에이전트 페르소나(ard-loop 소유자) | ✅ |
 | [Trend-Following-Youtube](./Trend-Following-Youtube/) | (레거시) RSS 텍스트 스크래퍼. ard-loop이 자막 기반으로 대체. [비전 vs 현실](./Trend-Following-Youtube/VISION_VS_REALITY.md) | 🟡 Phase 1 → ard-loop로 승계 |
+| **[git-sync](./git-sync/)** | **원격·로컬 단일 브랜치 동기화(모든 레포 공통).** 세션 시작 자동 동기화 + 종료 미푸시 경고 글로벌 훅 | ✅ 구현·라이브검증 |
 | [Claude-App-Factory](./Claude-App-Factory/) | Claude 중심 로컬 앱 빌딩 시스템 아키텍처 + 실행 부트스트랩 | 📐 문서+스크립트 |
 
 ---
