@@ -1,4 +1,11 @@
-# Trend-Following-Youtube
+# Trend-Following-Youtube 🗄️ ARCHIVED (2026-07-02)
+
+> **🗄️ 아카이브됨 — 이 프로젝트는 [ard-loop](../ard-loop/)으로 완전 대체됐다.**
+> 레거시 RSS 텍스트 스크래퍼(LLM 0, 회장 비전의 10~15%만 달성). 자막 기반 이해 파이프라인이 아니라 "RSS 제목에서 패키지명 줍는 스크립트"였다.
+> **살아있는 후속:** 코드=[`ard-loop/harvester/`](../ard-loop/harvester/) · 헌장=[`Youtube-Tracking/`](../Youtube-Tracking/) · 정직한 실패 사료=[`VISION_VS_REALITY.md`](./VISION_VS_REALITY.md).
+> 이 폴더는 **사료(history)로만 보존.** 신규 작업 금지 — 유튜브 학습은 ard-loop에서.
+
+---
 
 **ARD 하위 프로젝트 | YouTube 트렌드 → AI 역량 자동 업그레이드**
 
