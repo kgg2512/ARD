@@ -1,0 +1,34 @@
+{
+  "experiment": "skill-vs-direct categorical A/B",
+  "date": "2026-07-01",
+  "session": "62ca5d86",
+  "method": "generator(sonnet, skill-arm vs direct-arm) x3 blind judges(opus), shuffled labels, majority verdict",
+  "cost_tokens": { "pilot_est": 660000, "panel_measured": 3923354, "panel_agents": 60 },
+  "category": {
+    "knowledge": { "n": 6, "skillWins": 4, "directWins": 2, "ties": 0, "avgDelta": 0.4 },
+    "method": { "n": 6, "skillWins": 2, "directWins": 3, "ties": 1, "avgDelta": 0.3 }
+  },
+  "perSkill": [
+    { "key": "copywriting", "cat": "knowledge", "verdict": "SKILL", "panel": "3S-0D-0T", "avgSkill": 8.2, "avgDirect": 7.4, "delta": 0.8 },
+    { "key": "marketing-psychology", "cat": "knowledge", "verdict": "DIRECT", "panel": "0S-3D-0T", "avgSkill": 7.7, "avgDirect": 8.4, "delta": -0.8 },
+    { "key": "seo-audit", "cat": "knowledge", "verdict": "SKILL", "panel": "3S-0D-0T", "avgSkill": 8.7, "avgDirect": 7.3, "delta": 1.3 },
+    { "key": "gdpr-compliant", "cat": "knowledge", "verdict": "DIRECT", "panel": "0S-3D-0T", "avgSkill": 7.7, "avgDirect": 8.6, "delta": -0.9 },
+    { "key": "security-and-hardening", "cat": "knowledge", "verdict": "SKILL", "panel": "3S-0D-0T", "avgSkill": 8.7, "avgDirect": 8.0, "delta": 0.7 },
+    { "key": "gtm-0-to-1-launch", "cat": "knowledge", "verdict": "SKILL", "panel": "3S-0D-0T", "avgSkill": 8.6, "avgDirect": 7.3, "delta": 1.4 },
+    { "key": "ponytail", "cat": "method", "verdict": "tie", "panel": "0S-0D-3T", "avgSkill": 8.5, "avgDirect": 8.5, "delta": 0.0 },
+    { "key": "ui-ux-pro-max", "cat": "method", "verdict": "DIRECT", "panel": "0S-3D-0T", "avgSkill": 7.8, "avgDirect": 8.4, "delta": -0.6 },
+    { "key": "premium-frontend-ui", "cat": "method", "verdict": "DIRECT", "panel": "0S-3D-0T", "avgSkill": 7.0, "avgDirect": 8.7, "delta": -1.7 },
+    { "key": "systematic-debugging", "cat": "method", "verdict": "SKILL", "panel": "3S-0D-0T", "avgSkill": 8.3, "avgDirect": 5.3, "delta": 3.0 },
+    { "key": "test-driven-development", "cat": "method", "verdict": "SKILL", "panel": "3S-0D-0T", "avgSkill": 9.0, "avgDirect": 8.3, "delta": 0.7 },
+    { "key": "brainstorming", "cat": "method", "verdict": "DIRECT", "panel": "1S-2D-0T", "avgSkill": 8.0, "avgDirect": 7.9, "delta": 0.1 }
+  ],
+  "overall": { "skillWins": 6, "directWins": 5, "ties": 1, "avgDelta": 0.35 },
+  "findings": [
+    "knowledge-vs-method dichotomy does NOT predict skill value (avgDelta 0.4 vs 0.3, high intra-category variance)",
+    "most-mandated skills (ponytail tie, ui-ux-pro-max negative) are the ones least worth forcing",
+    "biggest winner systematic-debugging (+3.0) currently has ~0 real invocations",
+    "post-hoc hypothesis (unverified): rigor/completeness-injecting=win, scope/style-inflating=lose; crosses the knowledge/method label"
+  ],
+  "constitution_changed": false,
+  "status": "propose-only, awaiting chairman decision"
+}
