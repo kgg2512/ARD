@@ -129,6 +129,17 @@ SNS의 JARVIS/OpenClaw류가 파는 것 = **하네스**(LLM을 감싸는 실행 
 | git-sync | **L3** | ✅ 작동 | 유지 |
 | Claude-App-Factory / insights | 지식(L3 입력) | 🟢 축적 | 증거 태깅(개편 A) |
 
+### 개편 D — Creation 종착: Hermes 접합 (2026-07-04, 회장 지시)
+
+- **문제(실측):** ARD 수확물은 **불활성 큐**(자막·레포)로 끝나 `status=pending`만 쌓임(45건, 인지단계 사실상 0회 실행). Hermes 무인루프와 비교하니 결정적 차이 = **Hermes 산출물은 태생이 실행체(스킬)**, ARD는 지식→스킬 **증류 단계가 없음.**
+- **개편: ARD를 별도 루프가 아니라 G2 스킬 루프(=Hermes curator 이식본)의 "외부 입력 팔"로 접합.**
+  1. 수확(HARVEST) → 큐 적재 (현행 유지)
+  2. **실제 작업이 당김(Pull):** Alpha가 실작업 중 "더 나은 기법?" 시 큐를 조회 (push 아님)
+  3. **검증 통과 시 증류:** 그 기법이 실작업의 검증 게이트를 통과하면 → `.claude/skills/ard-<이름>/SKILL.md`로 박음. frontmatter: `g2_origin: agent-created` + `g2_created:<날짜>` + `g2_source: ard-harvest` + **`g2_verified: true`**(실작업 통과 = 측정된 효과 → 큐레이터 보호대상, 희귀해도 아카이브 안 됨).
+  4. **큐레이터 관할:** 이후는 기존 `curator.py`가 사용량으로 관리(코드 변경 0 — 이미 `g2_origin: agent-created` 관리·`g2_verified:true` 보호).
+- **튜닝(Hermes와 다르게):** Hermes 큐레이터 게이트=사용빈도. ARD발 스킬은 희귀하나 결정적일 수 있어 **게이트=사용빈도 아니라 "실작업 검증 통과 사건"**(`g2_verified:true`로 표현) → 조기 아카이브 방지.
+- **순효과:** 상주 0·제2두뇌 0·헌법 위반 0으로 Hermes 무인루프를 네이티브 재현. ARD = 세상의 지식을 G2 스킬 위장(curator)에 넣는 앞단. Creation 강제력은 헌법 완료 게이트(스킬화 판정)가 담당 → [[reference-hermes-creation-gate]].
+
 ---
 
 ## 6. 결정은 미루되, 구조는 준비 (회장 결정 최소화)
