@@ -41,6 +41,8 @@ HARVEST_STALE_HOURS = 48
 QUEUE_BACKLOG_WARN = 15
 ADOPTION_GRACE_DAYS = 7
 ORG_REVIEW_DAYS = 7              # 조직 리뷰 주기 — N일 지나면 CAR 조직 리뷰 촉구 (큐레이터 7일과 정합)
+LOOP_STALL_BACKLOG = 25         # 수확대기가 이 이상 + 최근 적용 없음 → 루프 정체(FAIL)
+LOOP_STALL_DAYS = 7             # 마지막 '적용'이 이보다 오래됐고 큐가 쌓이면 = 소화 멎음
 
 
 def load(path, default):
@@ -56,7 +58,10 @@ def hours_since(iso):
     if not iso:
         return None
     try:
-        return (datetime.now(timezone.utc) - datetime.fromisoformat(iso)).total_seconds() / 3600
+        dt = datetime.fromisoformat(str(iso))
+        if dt.tzinfo is None:              # date-only("2026-07-01")·naive → UTC로 간주 (적용원장 날짜 대응)
+            dt = dt.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - dt).total_seconds() / 3600
     except Exception:
         return None
 
@@ -153,11 +158,41 @@ def check_org_review(findings):
     return due
 
 
+def check_loop_health(findings, pending):
+    """소화 건강도 — 수확(입력)이 쌓이는데 적용/검증(출력)이 멎었나.
+    ARD 핵심 실패모드 = '개발이 아니라 저장'(hoarding). liveness가 아니라 outcome을 본다.
+    (회장 질문 '스스로 검증하려면?'의 답 = 이 자기점검: 루프가 실제로 닫히는지 자가진단.)"""
+    state = load(STATE_FILE, {})
+    processed = len(state.get("processed_ids", []))
+    items = load(APPLIED_FILE, {"items": []}).get("items", [])
+    applied_total = len(items)
+    applied_tool = sum(1 for it in items if it.get("type") in ("skill", "mcp"))
+    ages = [hours_since(it.get("applied_at")) for it in items]
+    ages = [a for a in ages if a is not None]
+    days_since_applied = (min(ages) / 24) if ages else None
+    digestion = processed / (processed + pending) if (processed + pending) else 1.0
+    stalled = (pending >= LOOP_STALL_BACKLOG and
+               (days_since_applied is None or days_since_applied > LOOP_STALL_DAYS))
+    recent = "없음" if days_since_applied is None else f"{days_since_applied:.0f}일전"
+    detail = (f"수확대기 {pending}·처리 {processed}·적용 {applied_total}"
+              f"(도구트랙 {applied_tool})·소화율 {digestion:.0%}·최근적용 {recent}")
+    if stalled:
+        findings.append(("FAIL", "loop_health", f"루프 정체(수확만 되고 소화·적용 멎음) — {detail}"))
+    elif pending >= QUEUE_BACKLOG_WARN:
+        findings.append(("WARN", "loop_health", detail))
+    else:
+        findings.append(("OK", "loop_health", detail))
+    return {"processed": processed, "applied_total": applied_total,
+            "applied_tool": applied_tool, "digestion": round(digestion, 2),
+            "days_since_applied": days_since_applied, "stalled": stalled}
+
+
 def main():
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     findings = []
     harvester_status = check_harvester(findings)
     pending = check_queue(findings)
+    loop = check_loop_health(findings, pending)
     adoption = check_adoption(findings)
     org_review_due = check_org_review(findings)
 
@@ -170,6 +205,7 @@ def main():
         "health": health,
         "harvester_status": harvester_status,
         "queue_pending": pending,
+        "loop_health": loop,
         "adoption": adoption,
         "org_review_due": org_review_due,
         "findings": [{"level": l, "area": a, "detail": d} for (l, a, d) in findings],

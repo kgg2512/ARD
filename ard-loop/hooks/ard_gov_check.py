@@ -118,6 +118,28 @@ def check_audit(sections):
         pass
 
 
+def check_loop(sections):
+    """ARD 루프 소화 건강 — 수확(입력)만 쌓이고 적용/검증(출력)이 멎었나.
+    schtasks 상주 미승인이라 이 SessionStart 훅이 실질 verifier.
+    liveness('돌았나')가 아니라 outcome('G2가 나아졌나')의 대리지표를 surface."""
+    queue = ARD / "queue"
+    pending = len(list(queue.glob("*.json"))) if queue.exists() else 0
+    applied = load(ARD / "applied.json", {"items": []}).get("items", [])
+    tool_applied = sum(1 for it in applied if it.get("type") in ("skill", "mcp"))
+    ages = [hours_since(it.get("applied_at")) for it in applied]
+    ages = [a for a in ages if a is not None]
+    days_since = (min(ages) / 24) if ages else None
+    stalled = pending >= 25 and (days_since is None or days_since > 7)
+    if stalled:
+        recent = "없음" if days_since is None else f"{days_since:.0f}일 전"
+        sections.append(
+            f"[ARD 루프 정체] 수확대기 {pending}건인데 도구트랙 적용 {tool_applied}건·최근적용 {recent} "
+            f"— '개발'이 아니라 '저장' 상태.\n"
+            f"→ Alpha: CAR(또는 general-purpose+CAR.md) 소환해 **상위 3건만 배치 소화**(전량 금지). "
+            f"소화 후 미적용이면 그 항목 기각·큐 정리. 방치 = 루프 죽음."
+        )
+
+
 def try_push(text):
     try:
         sys.path.insert(0, str(ARD / "notifier"))
@@ -140,6 +162,7 @@ def main():
         return 0
 
     sections = []
+    check_loop(sections)
     check_org(sections)
     check_audit(sections)
 
