@@ -29,6 +29,7 @@ STATE_FILE = ARD_DIR / "github_state.json"
 LOG_FILE = ARD_DIR / "harvester.log.jsonl"
 API = "https://api.github.com"
 DEFAULT_INTERVAL_HOURS = 12
+STAR_FARM_SUSPECT = 50000  # 이 이상인데 owner가 allowlist 밖 = 스타 파밍 의심 (스타수는 신뢰 신호 아님)
 
 
 def now_iso():
@@ -55,6 +56,19 @@ def load_json(path, default):
 def save_json(path, obj):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def classify_trust(owner, stars, trusted):
+    """신뢰 판정 — 스타수가 아니라 OWNER allowlist가 유일한 신뢰 근거.
+    실측(2026-07-09): GitHub이 무명 레포 affaan-m/ECC에 22.7만 스타를 반환 = 스타 파밍.
+    → 스타수는 관심도/relevance 신호일 뿐, 공급망 신뢰 근거로 쓰면 파밍당한 레포가 게이트 통과.
+    반환: (owner_trusted, star_suspect, trust_note)."""
+    if owner.lower() in trusted:
+        return True, False, "owner allowlist=신뢰(자동적용 후보)"
+    if stars >= STAR_FARM_SUSPECT:
+        return False, True, (f"⚠️ 고스타({stars})·비신뢰 소유자 — 스타 파밍 가능성. "
+                             f"스타수를 신뢰 근거로 쓰지 말 것(수동 확인·승인 큐)")
+    return False, False, "비신뢰 소유자 — 스타=관심도일 뿐 신뢰 아님(자동적용 불가, 승인 큐)"
 
 
 _TOKEN_DISABLED = False  # stale/invalid GH_TOKEN을 한 번 감지하면 이후 무인증으로
@@ -151,7 +165,7 @@ def harvest_releases(repo, seen_releases, harvested):
         log("gh_commit", repo=repo, sha=sha)
 
 
-def harvest_search(query, min_stars, days, seen_repos, harvested, max_results):
+def harvest_search(query, min_stars, days, seen_repos, harvested, max_results, trusted=frozenset()):
     """트렌딩/신규 레포 발굴."""
     q = urllib.parse.quote(query)
     data, err = gh_get(f"{API}/search/repositories?q={q}&sort=stars&order=desc&per_page={max_results}")
@@ -172,18 +186,23 @@ def harvest_search(query, min_stars, days, seen_repos, harvested, max_results):
         except Exception:
             pass
         seen_repos.append(full)
+        stars = repo.get("stargazers_count", 0)
+        owner_trusted, star_suspect, trust_note = classify_trust(full.split("/")[0], stars, trusted)
         item = {
             "id": f"gh-repo-{full.replace('/', '-')}",
             "source": "github",
             "kind": "trending_repo",
-            "title": f"신규/트렌딩 레포: {full} (⭐{repo.get('stargazers_count', 0)})",
+            "title": f"신규/트렌딩 레포: {full} (⭐{stars})",
             "channel": "GitHub Search",
             "url": repo.get("html_url", ""),
             "published": pushed,
             "harvested_at": now_iso(),
             "status": "pending",
-            "content": f"{repo.get('description', '')}\n\nstars: {repo.get('stargazers_count', 0)} | "
-                       f"language: {repo.get('language', '')} | query: {query}",
+            "owner_trusted": owner_trusted,
+            "star_suspect": star_suspect,
+            "trust_note": trust_note,
+            "content": f"{repo.get('description', '')}\n\nstars: {stars} | "
+                       f"language: {repo.get('language', '')} | query: {query}\ntrust: {trust_note}",
         }
         save_json(QUEUE_DIR / f"{item['id']}.json", item)
         harvested.append(item["id"])
@@ -216,13 +235,14 @@ def main():
     for repo in gh.get("watch_repos", []):
         harvest_releases(repo, seen_releases, harvested)
 
+    trusted = set(x.lower() for x in config.get("apply_policy", {}).get("trusted_publishers", []))
     search_cfg = gh.get("search", {})
     if search_cfg.get("active", True):
         min_stars = search_cfg.get("min_stars", 200)
         days = search_cfg.get("recent_days", 30)
         max_results = search_cfg.get("max_results", 8)
         for query in search_cfg.get("queries", []):
-            harvest_search(query, min_stars, days, seen_repos, harvested, max_results)
+            harvest_search(query, min_stars, days, seen_repos, harvested, max_results, trusted)
 
     state["last_run"] = now_iso()
     state["seen_releases"] = seen_releases
