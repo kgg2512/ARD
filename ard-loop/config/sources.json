@@ -26,6 +26,7 @@
       "modelcontextprotocol/servers",
       "anthropics/claude-code",
       "anthropics/anthropic-cookbook",
+      "anthropics/claude-plugins-official",
       "punkpeye/awesome-mcp-servers",
       "f/awesome-chatgpt-prompts"
     ],
