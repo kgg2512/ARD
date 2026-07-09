@@ -61,7 +61,10 @@ Write-Host "  youtube-transcript-api 설치 중..." -ForegroundColor Cyan
 if ($LASTEXITCODE -eq 0) { Write-Host "  ✅ youtube-transcript-api" -ForegroundColor Green }
 else { Write-Host "  ⚠️ pip 실패 — 수동: $pyExe -m pip install youtube-transcript-api" -ForegroundColor Yellow }
 
-# 4) Task Scheduler 등록 (유튜브 일 / 깃허브 일 / supervisor 주). 로그온 시에도 트리거.
+# 4) [옵션 B — 상주 데몬] Task Scheduler 등록. 2026-07-09 lean 개편 이후 이건 '선택'.
+#    기본(옵션 A, 권장): car_dispatch가 SessionStart에 harvest+supervisor(24h 게이트)를 자동 실행
+#    → 회장이 Claude Code를 열 때(≈매일)만 돌아 새 상주 데몬 0 (PC경량 원칙). schtasks는
+#    회장이 'Claude를 안 여는 날에도 수확/감독이 돌길' 원할 때만 필요. 원치 않으면 이 블록 skip 가능.
 $harvPath = Join-Path $ardOps 'harvester\car_harvester.py'
 $ghPath   = Join-Path $ardOps 'harvester\car_github_harvester.py'
 $supPath  = Join-Path $ardOps 'hooks\car_supervisor.py'

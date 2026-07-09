@@ -31,9 +31,12 @@ ORG_STATE_FILE = ARD_DIR / "org_state.json"       # 조직 리뷰 주기 (superv
 NOTICES_FILE = ARD_DIR / "notices.jsonl"
 HARVESTER = ARD_DIR / "harvester" / "car_harvester.py"
 GH_HARVESTER = ARD_DIR / "harvester" / "car_github_harvester.py"
+SUPERVISOR = ARD_DIR / "hooks" / "car_supervisor.py"
+SUP_STATE_FILE = ARD_DIR / "supervisor_state.json"
 NOTIFY_INTERVAL_HOURS = 20
 HARVEST_STALE_HOURS = 36          # 유튜브(자막 느림) → 백그라운드
 GH_STALE_HOURS = 12               # 깃허브(빠름) → 세션 시작 시 인라인 즉시 확인
+SUP_INTERVAL_HOURS = 24           # 감독관(car_supervisor) 자동 실행 게이트 — 상주 데몬 없이 SessionStart로 상주 효과
 
 
 def load(path, default):
@@ -125,6 +128,29 @@ def maybe_wake_harvesters():
             pass
 
 
+def maybe_run_supervisor():
+    """감독관(car_supervisor)을 24h 게이트로 자동 실행 — 상주 데몬(schtasks) 없이
+       SessionStart로 '방치 안 되는 자동 감독'을 구현(회장 lean 원칙). 서브프로세스로
+       실행해 supervisor의 stdout이 이 훅의 JSON 출력을 오염시키지 않게 격리.
+       YELLOW/RED 다이제스트만 반환(GREEN이면 None). health.json은 supervisor가 항상 기록."""
+    st = load(SUP_STATE_FILE, {})
+    age = hours_since(st.get("last_run"))
+    if not (age is None or age >= SUP_INTERVAL_HOURS):
+        return None
+    if not SUPERVISOR.exists():
+        return None
+    try:
+        p = subprocess.run([sys.executable, str(SUPERVISOR)],
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=30)
+        st["last_run"] = datetime.now(timezone.utc).isoformat()
+        save(SUP_STATE_FILE, st)
+        out = (p.stdout or "").strip()
+        return out or None
+    except Exception:
+        return None
+
+
 def main():
     # stdin 비우기(훅 계약), 내용은 사용 안 함
     try:
@@ -139,6 +165,11 @@ def main():
     maybe_wake_harvesters()
 
     sections = []
+
+    # 감독관 자동 실행(24h 게이트) — 상주 데몬 없이 자동 감독. YELLOW/RED만 surface.
+    sup_digest = maybe_run_supervisor()
+    if sup_digest:
+        sections.append(sup_digest)
 
     # (A) 일회성 공지 — 노트북 켤 때마다(max_shows까지) 무조건 surface
     notices = read_notices()
