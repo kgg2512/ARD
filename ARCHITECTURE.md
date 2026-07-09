@@ -139,6 +139,7 @@ SNS의 JARVIS/OpenClaw류가 파는 것 = **하네스**(LLM을 감싸는 실행 
   4. **큐레이터 관할:** 이후는 기존 `curator.py`가 사용량으로 관리(코드 변경 0 — 이미 `g2_origin: agent-created` 관리·`g2_verified:true` 보호).
 - **튜닝(Hermes와 다르게):** Hermes 큐레이터 게이트=사용빈도. ARD발 스킬은 희귀하나 결정적일 수 있어 **게이트=사용빈도 아니라 "실작업 검증 통과 사건"**(`g2_verified:true`로 표현) → 조기 아카이브 방지.
 - **순효과:** 상주 0·제2두뇌 0·헌법 위반 0으로 Hermes 무인루프를 네이티브 재현. ARD = 세상의 지식을 G2 스킬 위장(curator)에 넣는 앞단. Creation 강제력은 헌법 완료 게이트(스킬화 판정)가 담당 → [[reference-hermes-creation-gate]].
+- **[구현 2026-07-09]** Pull 프리미티브 `ard-loop/pull/car_pull.py` 신설(큐 키워드 조회, LLM0·네트워크0, 실제 34건 큐 검증 PASS) + `car_dispatch.py`를 "전량 처리 강권"→"실작업이 당길 때 조회" 안내로 전환. 개편 D의 (2) Pull 배선 완료. 증류(3)·큐레이터(4)는 실작업 통과 시 헌법 스킬화 게이트가 담당(기구현).
 
 ---
 

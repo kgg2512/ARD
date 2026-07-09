@@ -22,7 +22,7 @@ Write-Host "  python: $pyExe" -ForegroundColor Green
 # 1) 운영 디렉토리 생성
 foreach ($d in @($ardOps, (Join-Path $ardOps 'config'), (Join-Path $ardOps 'queue'),
                  (Join-Path $ardOps 'reports'), (Join-Path $ardOps 'harvester'),
-                 (Join-Path $ardOps 'hooks'), $agentsDir, $hooksDir)) {
+                 (Join-Path $ardOps 'hooks'), (Join-Path $ardOps 'pull'), $agentsDir, $hooksDir)) {
     New-Item -ItemType Directory -Force -Path $d | Out-Null
 }
 
@@ -33,6 +33,7 @@ Copy-Item (Join-Path $loop 'harvester\car_github_harvester.py') (Join-Path $ardO
 Copy-Item (Join-Path $loop 'hooks\car_dispatch.py')            (Join-Path $ardOps 'hooks\car_dispatch.py') -Force
 Copy-Item (Join-Path $loop 'hooks\car_supervisor.py')      (Join-Path $ardOps 'hooks\car_supervisor.py') -Force
 Copy-Item (Join-Path $loop 'hooks\car_dispatch.py')        (Join-Path $hooksDir 'car_dispatch.py') -Force
+Copy-Item (Join-Path $loop 'pull\car_pull.py')             (Join-Path $ardOps 'pull\car_pull.py') -Force
 New-Item -ItemType Directory -Force -Path (Join-Path $ardOps 'notifier') | Out-Null
 Copy-Item (Join-Path $loop 'notifier\car_notify.py')       (Join-Path $ardOps 'notifier\car_notify.py') -Force
 Copy-Item (Join-Path $repoRoot 'agents\CAR.md')            (Join-Path $agentsDir 'car.md') -Force

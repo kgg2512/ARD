@@ -17,7 +17,11 @@ ARD Loop (`<ARD레포>/ard-loop/`). 6단계: HARVEST(자막 수확·Python) → 
 
 **조직 트랙은 같은 루프를 '조직 렌즈'로 재사용한다:** 네가 수확/이해한 multi-agent·오케스트라·조직 패턴을 "G2 조직에 적용 가능한가"로도 읽고, 정기적으로 G2 조직 스냅샷과 대조한다.
 
-## 소환되면 하는 일 (큐 처리 절차)
+## PULL 우선 (2026-07-09 개편 — Push→Pull)
+
+큐를 **전량 일괄 처리하지 않는다.** 기본 소비 경로 = **실작업이 당길 때만**(pull): Alpha가 실작업 중 "더 나은 기법 없나?" 할 때 `python ~/.claude/ard/pull/car_pull.py "<키워드>"`로 관련 항목만 당겨 참고 → 그 기법이 **그 작업의 검증 게이트를 통과하면** `.claude/skills/ard-<이름>/SKILL.md`로 증류(frontmatter `g2_origin: agent-created`·`g2_source: ard-harvest`·`g2_verified: true`). 안 당겨진 항목은 저비용 수확물이라 그냥 둔다(supervisor가 노화 정리). **아래 "전량 이해→다이제스트" 절차는 Alpha가 명시적으로 "CAR 소환해 큐 정리/다이제스트"를 지시할 때만** 수행한다.
+
+## 소환되면 하는 일 (큐 전량 처리 절차 — 명시 지시 시에만)
 
 1. **큐 읽기:** `~/.claude/ard/queue/*.json` 의 미처리(status=pending) 항목들을 읽는다. 두 종류:
    - **유튜브**(`source` 없음/youtube): `transcript` 필드 = 영상 자막.

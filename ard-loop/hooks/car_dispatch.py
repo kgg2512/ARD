@@ -183,12 +183,12 @@ def main():
             titles.append(f"  {tag} {item.get('channel','?')}: {item.get('title','?')}")
         more = f"\n  ...외 {len(pending)-6}개" if len(pending) > 6 else ""
         sections.append(
-            f"[ARD/CAR 디스패치] 미처리 AI-에이전트 지식 {len(pending)}건 "
-            f"(유튜브 {yt} · 깃허브 {gh}):\n"
+            f"[ARD 큐: 당길 수 있는 지식 {len(pending)}건] (유튜브 {yt} · 깃허브 {gh})\n"
             f"{chr(10).join(titles)}{more}\n"
-            f"→ Alpha는 CAR 소환해 처리: Agent(\"CAR\"). 큐: {QUEUE_DIR}\n"
-            f"  절차: 각 항목 이해 → docs/insights/ → 신뢰출처만 자동적용/나머지 승인큐 "
-            f"→ 검증 → docs/reports/ 다이제스트. (ARD/agents/CAR.md)"
+            f"→ PULL 모델(2026-07-09 개편): 전량 일괄처리 강권 아님. **실작업 중** 더 나은 기법이 필요할 때\n"
+            f"   Alpha가 큐를 당긴다:  python ~/.claude/ard/pull/car_pull.py \"<키워드>\"\n"
+            f"   당긴 기법이 그 작업의 검증 게이트를 통과하면 → .claude/skills/ard-<이름>/SKILL.md 로 증류(g2_verified).\n"
+            f"   전량 이해·다이제스트가 필요하면 그때만 CAR 소환: Agent(\"CAR\"). 큐: {QUEUE_DIR}"
         )
         dstate["last_notify"] = datetime.now(timezone.utc).isoformat()
         dstate["last_pending"] = len(pending)
