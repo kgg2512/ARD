@@ -39,6 +39,7 @@ SKILL_USAGE = Path.home() / ".claude" / "skill_usage.jsonl"   # G2 기존 사용
 
 HARVEST_STALE_HOURS = 48
 QUEUE_BACKLOG_WARN = 15
+VALUE_REVIEW_GATE = 20          # 큐가 이 이상이면 회장에게 '이 루프 존폐 가치판정'을 자동 요청 (회장 지시 2026-07-12)
 ADOPTION_GRACE_DAYS = 7
 ORG_REVIEW_DAYS = 7              # 조직 리뷰 주기 — N일 지나면 CAR 조직 리뷰 촉구 (큐레이터 7일과 정합)
 LOOP_STALL_BACKLOG = 25         # 수확대기가 이 이상 + 최근 적용 없음 → 루프 정체(FAIL)
@@ -200,6 +201,10 @@ def main():
     has_warn = any(f[0] == "WARN" for f in findings)
     health = "RED" if has_fail else ("YELLOW" if has_warn else "GREEN")
 
+    # 회장 가치판정 게이트 (2026-07-12): 큐가 VALUE_REVIEW_GATE 도달 = 5번(루프 존폐)의 자동화.
+    # 무인 CAR 자동배출(토큰 낭비)이 아니라, 정량 근거로 회장에게 '이 루프 계속할 가치 있나'를 올린다.
+    value_review_due = pending >= VALUE_REVIEW_GATE
+
     report = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "health": health,
@@ -208,6 +213,7 @@ def main():
         "loop_health": loop,
         "adoption": adoption,
         "org_review_due": org_review_due,
+        "value_review_due": value_review_due,
         "findings": [{"level": l, "area": a, "detail": d} for (l, a, d) in findings],
     }
     date = datetime.now(timezone.utc).strftime("%Y%m%d")
@@ -218,12 +224,21 @@ def main():
         pass
 
     # 회장 다이제스트 (GREEN이면 조용히, YELLOW/RED만 출력 + 폰 푸시)
-    if health != "GREEN":
+    if health != "GREEN" or value_review_due:
         lines = [f"[ARD/CAR 감독] 건강도: {health}"]
         for (l, a, d) in findings:
             if l != "OK":
                 lines.append(f"  [{l}] {a}: {d}")
         lines.append("→ Alpha/CAR 후속 조치 필요.")
+        # 🔔 회장 가치판정 요청 (큐 20+ 도달 = 5번 자동화). 회장이 계속/조준수정/중단을 정량 근거로 결정.
+        if value_review_due:
+            dsa = loop.get("days_since_applied")
+            recent = "없음" if dsa is None else f"{dsa:.0f}일 전"
+            lines.append("")
+            lines.append(f"🔔 [회장 가치판정 요청] 큐 {pending}건 도달 (게이트 {VALUE_REVIEW_GATE}) — 이 루프가 회장께 값진지 판정할 시점.")
+            lines.append(f"   누적 실적: 처리 {loop.get('processed', 0)} · 도구적용 {loop.get('applied_tool', 0)}건 · "
+                         f"소화율 {loop.get('digestion', 0):.0%} · 최근적용 {recent}")
+            lines.append("   → 회장 판정: ① 계속(현 조준 유지)  ② 조준수정(sources.json)  ③ 중단(루프 정지)")
         digest = "\n".join(lines)
         print(digest)
         # Telegram 푸시(설정 시) — Mariah 'Reports via Telegram' 이식

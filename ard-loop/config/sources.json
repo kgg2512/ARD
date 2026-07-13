@@ -9,14 +9,14 @@
       "ai agent", "ai orchestra", "agent orchestration", "multi-agent",
       "subagent", "agentic", "skill", "workflow", "automation",
       "cursor", "windsurf", "n8n", "langgraph", "autogen", "crewai",
-      "solo founder", "one person startup", "indie hacker", "vibe coding"
+      "vibe coding"
     ]
   },
   "youtube": [
     { "name": "All About AI",   "channel_id": "UCR9j1jqqB5Rse69wjUnbYwA", "handle": "@AllAboutAI",   "priority": "high",   "active": true, "note": "Claude Code MCP/Skill 전문" },
     { "name": "Fireship",       "channel_id": "UCsBjURrPoezykLs9EqgamOA", "handle": "@Fireship",     "priority": "medium", "active": true, "note": "AI 트렌드 즉각 반응" },
     { "name": "Dave Ebbelaar",  "channel_id": "UCn8ujwUInbJkBhffxqAPBVQ", "handle": "@daveebbelaar", "priority": "high",   "active": true, "note": "MCP 실습 튜토리얼" },
-    { "name": "Liam Ottley",    "channel_id": "UCui4jxDaMb53Gdh-AZUTPAg", "handle": "@LiamOttley",   "priority": "low",    "active": true, "note": "AI 에이전트 자동화 비즈니스" }
+    { "name": "Liam Ottley",    "channel_id": "UCui4jxDaMb53Gdh-AZUTPAg", "handle": "@LiamOttley",   "priority": "low",    "active": false, "note": "OFF 2026-07-12 — 큐 배출서 5/5 수익낚시 클릭베이트 evict. 기술신호 낮아 조준 제외(회장 지시)" }
   ],
   "github": {
     "_comment": "릴리스/커밋 추적 + 트렌딩 검색. CAR이 신규 스킬/MCP/에이전트 후보 발굴. GITHUB_TOKEN 있으면 rate↑(없어도 60/h 동작).",
@@ -33,15 +33,13 @@
     ],
     "search": {
       "active": true,
-      "min_stars": 200,
+      "min_stars": 1500,
       "recent_days": 30,
-      "max_results": 8,
+      "max_results": 3,
       "queries": [
         "claude code mcp",
         "mcp server",
-        "ai agent orchestration",
-        "claude agent skill",
-        "solo founder ai automation"
+        "claude agent skill"
       ]
     }
   },
