@@ -28,7 +28,8 @@
       "anthropics/anthropic-cookbook",
       "anthropics/claude-plugins-official",
       "punkpeye/awesome-mcp-servers",
-      "f/awesome-chatgpt-prompts"
+      "f/awesome-chatgpt-prompts",
+      "hesreallyhim/awesome-claude-code"
     ],
     "search": {
       "active": true,
