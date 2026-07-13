@@ -26,6 +26,10 @@
 - `results/` — 실험별 결과 리포트 (날짜_주제).
 - `data/` — 원시 판정 데이터(JSON).
 - `experiments/` — 실험 **사전등록(설계)** 문서. 실행 전 가설·분류·예측을 잠가 확증편향 차단.
+- `harness_stats.py` — **통계 계측기(2026-07-14 신설).** point estimate 단독 산출을 코드가 금지한다.
+  - MODE1 `--reanalyze`: judge 일치도 × |Δ|로 현 N=1 데이터 신뢰등급(HIGH/MEDIUM/LOW/NOISE) → `results/2026-07-14_statistical-reanalysis.md`
+  - MODE2 `nrep_stats()`: variant당 N≥2 점수 → 평균·표준편차·95% 부트스트랩 CI·Cohen's d·유의판정 (3차 실험이 N≥3로 가면 진짜 유의성)
+  - `--selftest`: 통계 정확성 수기 대조 9/9 PASS. 의존성 0(stdlib만).
 - 이 프로젝트의 결론은 **헌법 개정 제안**의 근거가 된다(★반영은 회장 승인 후 — 이 폴더는 propose-only).
 
 ## 현황
