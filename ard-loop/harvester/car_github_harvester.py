@@ -58,6 +58,40 @@ def save_json(path, obj):
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+# ── 수확 쓸모 게이트 배선 (ard-loop/gate/apply_gates.py) ──────────────────
+# HARVEST→QUEUE 상류 필터. 게이트 import/실행 실패 시 무게이트로 폴백(회귀 0).
+_GATE = None
+_GATE_CTX = None
+
+
+def _init_gate(config, seen_ids):
+    """게이트 모듈 로드 + 컨텍스트 구성. 실패해도 하베스터는 정상 동작(fail-open)."""
+    global _GATE, _GATE_CTX
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "gate"))
+        import apply_gates
+        _GATE = apply_gates
+        _GATE_CTX = apply_gates.build_ctx(config, seen_ids=seen_ids)
+    except Exception as e:
+        _GATE = None
+        log("gate_import_skip", error=str(e))
+
+
+def _gate_admit(item):
+    """큐 적재 허용 여부. REJECT면 False + log("gate_reject"). 오류 시 fail-open(True)."""
+    if not (_GATE and _GATE_CTX):
+        return True
+    try:
+        keep, res = _GATE.should_queue(item, _GATE_CTX)
+        if not keep:
+            log("gate_reject", id=item.get("id"), score=res.get("score"),
+                reasons=res.get("reasons"))
+        return keep
+    except Exception as e:
+        log("gate_error_admit", error=str(e))
+        return True
+
+
 def classify_trust(owner, stars, trusted):
     """신뢰 판정 — 스타수가 아니라 OWNER allowlist가 유일한 신뢰 근거.
     실측(2026-07-09): GitHub이 무명 레포 affaan-m/ECC에 22.7만 스타를 반환 = 스타 파밍.
@@ -135,6 +169,8 @@ def harvest_releases(repo, seen_releases, harvested):
             "status": "pending",
             "content": (data.get("body") or "")[:6000],
         }
+        if not _gate_admit(item):
+            return
         save_json(QUEUE_DIR / f"{item['id']}.json", item)
         harvested.append(item["id"])
         log("gh_release", repo=repo, tag=tag)
@@ -160,6 +196,8 @@ def harvest_releases(repo, seen_releases, harvested):
             "status": "pending",
             "content": msg[:2000],
         }
+        if not _gate_admit(item):
+            return
         save_json(QUEUE_DIR / f"{item['id']}.json", item)
         harvested.append(item["id"])
         log("gh_commit", repo=repo, sha=sha)
@@ -204,6 +242,8 @@ def harvest_search(query, min_stars, days, seen_repos, harvested, max_results, t
             "content": f"{repo.get('description', '')}\n\nstars: {stars} | "
                        f"language: {repo.get('language', '')} | query: {query}\ntrust: {trust_note}",
         }
+        if not _gate_admit(item):
+            continue
         save_json(QUEUE_DIR / f"{item['id']}.json", item)
         harvested.append(item["id"])
         log("gh_trending", repo=full, stars=repo.get("stargazers_count", 0))
@@ -231,6 +271,10 @@ def main():
     seen_releases = state.get("seen_releases", {})
     seen_repos = state.get("seen_repos", [])
     harvested = []
+
+    # 수확 쓸모 게이트 초기화 — 이미 큐에 있는 id를 dedup seen으로 공급
+    existing_ids = [p.stem for p in QUEUE_DIR.glob("*.json")]
+    _init_gate(config, existing_ids)
 
     for repo in gh.get("watch_repos", []):
         harvest_releases(repo, seen_releases, harvested)
