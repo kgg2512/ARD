@@ -30,6 +30,40 @@ except Exception:
 
 QUEUE_DIR = os.path.join(os.path.expanduser("~"), ".claude", "ard", "queue")
 
+# ── 주장 검증 하네스 배선 (ard-loop/gate/apply_gates.py) ──────────────────
+# pull한 항목을 실작업에 적용·증류하기 전 주장을 검증(프로브 없이는 VERIFIED 아님).
+# 게이트 import 실패 시 검증 없이 정상 동작(fail-open, 회귀0).
+_VERIFY = None
+try:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gate"))
+    from apply_gates import verify_item as _VERIFY
+except Exception:
+    _VERIFY = None
+
+
+def verify_report(item):
+    """항목 주장 검증 리포트(dict) 또는 None(게이트 미탑재/오류). content=자막·본문."""
+    if not _VERIFY:
+        return None
+    try:
+        return _VERIFY({"id": item.get("id", ""), "title": item.get("title", ""),
+                        "content": item.get("_body", ""),
+                        "star_suspect": bool(item.get("star_suspect", False))})
+    except Exception:
+        return None
+
+
+def _print_verify(item):
+    rep = verify_report(item)
+    if not rep or not rep.get("claims"):
+        return
+    print("\n" + "-" * 60)
+    print("[주장 검증] 적용·증류 전 확인 — 프로브 없이는 VERIFIED 아님 (수확 텍스트=주장, 소스≠런타임):")
+    print("  summary:", rep["summary"])
+    for c in rep["claims"]:
+        if c["verdict"] != "VERIFIED":
+            print("  [%s] %s — %s" % (c["verdict"], c["claim"], c["required_probe"]))
+
 
 def load_items():
     items = []
@@ -99,6 +133,7 @@ def main():
         print("published:", hit.get("published", ""), "| chars:", len(hit["_body"]))
         print("-" * 60)
         print(hit["_body"])
+        _print_verify(hit)
         return 0
 
     if not args.query:
@@ -112,9 +147,15 @@ def main():
     top = scored[: args.limit]
 
     if args.json:
-        out = [{"id": it.get("id"), "score": s, "source": it.get("source", "youtube"),
-                "title": it.get("title"), "channel": it.get("channel"), "url": it.get("url"),
-                "snippet": snippet(it, terms)} for s, it in top]
+        out = []
+        for s, it in top:
+            rep = verify_report(it) or {}
+            out.append({"id": it.get("id"), "score": s, "source": it.get("source", "youtube"),
+                        "title": it.get("title"), "channel": it.get("channel"), "url": it.get("url"),
+                        "snippet": snippet(it, terms),
+                        "verify": rep.get("summary"),
+                        "unverified_claims": [c for c in rep.get("claims", [])
+                                              if c["verdict"] != "VERIFIED"]})
         print(json.dumps(out, ensure_ascii=False, indent=2))
         return 0
 
@@ -129,6 +170,11 @@ def main():
         print("  (%d) %-14s %s" % (s, it.get("id", "?"), fmt_meta(it)))
         print("       %s" % it.get("url", ""))
         print("       …%s" % snippet(it, terms))
+        _rep = verify_report(it)
+        if _rep and _rep["summary"]["total"]:
+            _u = _rep["summary"]["unverified"] + _rep["summary"]["contradicted"]
+            if _u:
+                print("       ⚠ 미검증 주장 %d건 — 적용 전 원본/런타임 확인(--show)" % _u)
         print("       전체보기: car_pull.py --show %s\n" % it.get("id", ""))
     return 0
 

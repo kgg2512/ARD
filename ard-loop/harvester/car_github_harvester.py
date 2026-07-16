@@ -160,6 +160,7 @@ def harvest_releases(repo, seen_releases, harvested):
         item = {
             "id": f"gh-rel-{repo.replace('/', '-')}-{tag}",
             "source": "github",
+            "watched": True,
             "kind": "release",
             "title": f"{repo} {tag} 릴리스",
             "channel": "GitHub",
@@ -187,6 +188,7 @@ def harvest_releases(repo, seen_releases, harvested):
         item = {
             "id": f"gh-com-{repo.replace('/', '-')}-{sha}",
             "source": "github",
+            "watched": True,
             "kind": "commit",
             "title": f"{repo} 최신 커밋 {sha}",
             "channel": "GitHub",

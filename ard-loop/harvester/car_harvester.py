@@ -56,6 +56,39 @@ def save_json(path, obj):
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+# ── 수확 쓸모 게이트 배선 (ard-loop/gate/apply_gates.py) — fail-open, 회귀0 ──
+_GATE = None
+_GATE_CTX = None
+
+
+def _init_gate(config, seen_ids):
+    """게이트 로드 + 컨텍스트. 실패해도 하베스터 정상 동작(fail-open)."""
+    global _GATE, _GATE_CTX
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "gate"))
+        import apply_gates
+        _GATE = apply_gates
+        _GATE_CTX = apply_gates.build_ctx(config, seen_ids=seen_ids)
+    except Exception as e:
+        _GATE = None
+        log("gate_import_skip", error=str(e))
+
+
+def _gate_admit(item):
+    """큐 적재 허용 여부. REJECT면 False + log("gate_reject"). 오류 시 fail-open(True)."""
+    if not (_GATE and _GATE_CTX):
+        return True
+    try:
+        keep, res = _GATE.should_queue(item, _GATE_CTX)
+        if not keep:
+            log("gate_reject", id=item.get("id"), score=res.get("score"),
+                reasons=res.get("reasons"))
+        return keep
+    except Exception as e:
+        log("gate_error_admit", error=str(e))
+        return True
+
+
 def should_run(state, interval_hours, force):
     if force:
         return True
@@ -159,7 +192,9 @@ def main():
     processed = set(state.get("processed_ids", []))
     channels = [c for c in config.get("youtube", []) if c.get("active", True)]
 
-    harvested, skipped_irrelevant, no_transcript = 0, 0, 0
+    # 수확 쓸모 게이트 초기화 — 이미 큐에 있는 id를 dedup seen으로 공급
+    _init_gate(config, [p.stem for p in QUEUE_DIR.glob("*.json")])
+    harvested, skipped_irrelevant, no_transcript, gate_rejected = 0, 0, 0, 0
 
     for ch in channels:
         cid = ch.get("channel_id", "")
@@ -197,6 +232,10 @@ def main():
                 "transcript_chars": len(transcript),
                 "transcript": transcript,
             }
+            # 쓸모 게이트: 자막을 content로 넘겨 중복·baseline·FOMO 판정
+            if not _gate_admit({**item, "content": transcript}):
+                gate_rejected += 1
+                continue
             save_json(QUEUE_DIR / f"{vid}.json", item)
             harvested += 1
             log("harvested", id=vid, title=video["title"], channel=ch["name"], chars=len(transcript))
@@ -208,12 +247,13 @@ def main():
     summary = {
         "harvested": harvested,
         "skipped_irrelevant": skipped_irrelevant,
+        "gate_rejected": gate_rejected,
         "no_transcript": no_transcript,
         "queue_pending": len(list(QUEUE_DIR.glob("*.json"))),
     }
     log("run_complete", **summary)
     print(f"[CAR Harvester] 수확 {harvested} · 무관 skip {skipped_irrelevant} · "
-          f"자막없음 {no_transcript} · 큐 대기 {summary['queue_pending']}")
+          f"게이트 reject {gate_rejected} · 자막없음 {no_transcript} · 큐 대기 {summary['queue_pending']}")
     return 0
 
 

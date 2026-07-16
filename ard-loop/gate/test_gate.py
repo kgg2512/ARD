@@ -147,6 +147,18 @@ def case9_popularity_precision():
         assert any(c["type"] == "popularity" for c in claims), (t, claims)
 
 
+def case10_watched_relevance_exempt():
+    """⑩ watch/trusted 소스는 관련성 0이어도 하드리젝 면제(≠REJECT), 무관 일반은 REJECT (실주행 결함 시정)"""
+    terse = {"id": "gh-com-anthropics-cookbook-abc",
+             "title": "anthropics/anthropic-cookbook 최신 커밋 abc",
+             "content": "Update README"}  # 관련 키워드 0
+    assert score_item(terse, CTX)["verdict"] == "REJECT", score_item(terse, CTX)
+    watched = dict(terse, watched=True)
+    assert score_item(watched, CTX)["verdict"] != "REJECT", score_item(watched, CTX)
+    trusted = dict(terse, owner_trusted=True)
+    assert score_item(trusted, CTX)["verdict"] != "REJECT", score_item(trusted, CTX)
+
+
 CASES = [
     ("① 중복→REJECT(dedup)", case1_dedup_reject),
     ("② 관련성0→REJECT", case2_zero_relevance_reject),
@@ -157,6 +169,7 @@ CASES = [
     ("⑦ star_suspect→popularity CONTRADICTED", case7_star_suspect_contradicted),
     ("⑧ probes 주입시 VERIFIED 전환", case8_probes_enable_verified),
     ("⑨ popularity 정규식 정밀도(오탐 0)", case9_popularity_precision),
+    ("⑩ watch/trusted 관련성 면제(실주행 결함 시정)", case10_watched_relevance_exempt),
 ]
 
 if __name__ == "__main__":

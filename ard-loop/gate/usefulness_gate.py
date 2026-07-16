@@ -121,14 +121,21 @@ def score_item(item: dict, ctx: dict) -> dict:
         + trust_delta
     )
 
-    if signals["relevance_hits"] < min_rel:
+    # watch/trusted 소스는 관련성 하드리젝 면제 — 큐레이션된 출처(watch_repos·allowlist owner)의
+    # 업데이트는 커밋 메시지가 키워드 부족해도 유지(정당한 업데이트 유실 방지). dedup·FOMO·baseline은 그대로.
+    # 근거: 2026-07-16 실주행 검증에서 anthropics 커밋이 '관련성 0'으로 오탈락한 결함 시정.
+    relevance_exempt = trusted or bool(item.get("watched"))
+    if signals["relevance_hits"] < min_rel and not relevance_exempt:
         if signals["relevance_hits"] == 0:
             reasons.insert(0, "관련성 0")
         else:
             reasons.insert(0, "관련성 부족 (%d < min %d)" % (signals["relevance_hits"], min_rel))
         verdict = "REJECT"
     else:
-        reasons.insert(0, "관련 키워드 %d개 매치 (%s)" % (len(hit_kws), ", ".join(hit_kws)))
+        if signals["relevance_hits"] < min_rel:
+            reasons.insert(0, "관련성 낮으나 watch/trusted 소스 — 유지")
+        else:
+            reasons.insert(0, "관련 키워드 %d개 매치 (%s)" % (len(hit_kws), ", ".join(hit_kws)))
         if score >= ACCEPT_MIN:
             verdict = "ACCEPT"
         elif score >= REVIEW_MIN:
