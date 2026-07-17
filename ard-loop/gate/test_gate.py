@@ -159,6 +159,15 @@ def case10_watched_relevance_exempt():
     assert score_item(trusted, CTX)["verdict"] != "REJECT", score_item(trusted, CTX)
 
 
+def case11_crypto_clickbait_fomo():
+    """⑪ 크립토/트레이딩 수익낚시 클릭베이트 → FOMO 신호 다수 감지(점수 다운그레이드)"""
+    item = {"id": "yt:trade-1",
+            "title": "This AI Trading Bot Is CRUSHING It 24/7 — passive income to the moon",
+            "content": "ai agent automation for crypto trading"}
+    r = score_item(item, CTX)
+    assert r["signals"]["fomo_hits"] >= 3, r
+
+
 CASES = [
     ("① 중복→REJECT(dedup)", case1_dedup_reject),
     ("② 관련성0→REJECT", case2_zero_relevance_reject),
@@ -170,6 +179,7 @@ CASES = [
     ("⑧ probes 주입시 VERIFIED 전환", case8_probes_enable_verified),
     ("⑨ popularity 정규식 정밀도(오탐 0)", case9_popularity_precision),
     ("⑩ watch/trusted 관련성 면제(실주행 결함 시정)", case10_watched_relevance_exempt),
+    ("⑪ 크립토/트레이딩 클릭베이트 FOMO 감지", case11_crypto_clickbait_fomo),
 ]
 
 if __name__ == "__main__":

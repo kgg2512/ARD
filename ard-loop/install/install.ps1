@@ -1,4 +1,4 @@
-# install.ps1 — ARD Loop(CAR 자율학습 시스템) 로컬 설치 (Windows)
+﻿# install.ps1 — ARD Loop(CAR 자율학습 시스템) 로컬 설치 (Windows)
 # 한 번 실행하면: 의존성 설치 + 스크립트 비치 + CAR 에이전트 등록 +
 #   harvester(일)·supervisor(주) Task Scheduler 등록 + SessionStart 훅 배선.
 # 멱등. 실행: pwsh -File install.ps1   (또는 .\install.ps1)
@@ -13,8 +13,9 @@ $ardOps   = Join-Path $HOME '.claude\ard'
 $agentsDir = Join-Path $HOME '.claude\agents'
 $hooksDir  = Join-Path $HOME '.claude\hooks'
 
-# python 실행기 탐색
-$py = (Get-Command python -ErrorAction SilentlyContinue) ?? (Get-Command py -ErrorAction SilentlyContinue)
+# python 실행기 탐색 (PS 5.1 호환 — '??' 연산자는 PS7 전용이라 미사용)
+$py = Get-Command python -ErrorAction SilentlyContinue
+if (-not $py) { $py = Get-Command py -ErrorAction SilentlyContinue }
 if (-not $py) { Write-Host "[MISSING] python — 설치 후 재실행" -ForegroundColor Yellow; return }
 $pyExe = $py.Source
 Write-Host "  python: $pyExe" -ForegroundColor Green
@@ -34,6 +35,13 @@ Copy-Item (Join-Path $loop 'hooks\car_dispatch.py')            (Join-Path $ardOp
 Copy-Item (Join-Path $loop 'hooks\car_supervisor.py')      (Join-Path $ardOps 'hooks\car_supervisor.py') -Force
 Copy-Item (Join-Path $loop 'hooks\car_dispatch.py')        (Join-Path $hooksDir 'car_dispatch.py') -Force
 Copy-Item (Join-Path $loop 'pull\car_pull.py')             (Join-Path $ardOps 'pull\car_pull.py') -Force
+# gate/ 배포 — 하베스터(../gate)·pull(../gate)이 수확 쓸모 게이트+주장 검증 하네스를 import.
+#   이게 없으면 설치된 하베스터가 gate import 실패→무게이트 폴백(게이트 무력화). 필수.
+New-Item -ItemType Directory -Force -Path (Join-Path $ardOps 'gate') | Out-Null
+foreach ($g in @('usefulness_gate.py','claim_verifier.py','apply_gates.py','test_gate.py')) {
+    Copy-Item (Join-Path $loop "gate\$g") (Join-Path $ardOps "gate\$g") -Force
+}
+Write-Host "  게이트 배포: $ardOps\gate (수확 쓸모+주장 검증 하네스)" -ForegroundColor Green
 New-Item -ItemType Directory -Force -Path (Join-Path $ardOps 'notifier') | Out-Null
 Copy-Item (Join-Path $loop 'notifier\car_notify.py')       (Join-Path $ardOps 'notifier\car_notify.py') -Force
 Copy-Item (Join-Path $repoRoot 'agents\CAR.md')            (Join-Path $agentsDir 'car.md') -Force

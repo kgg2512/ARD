@@ -33,6 +33,13 @@ _FOMO_RAW = [
     r"must[- ]?have",
     r"\$\d+\s*(?:startup|stack|/mo)",
     r"in 202\d you need",
+    # 크립토/트레이딩·수익낚시 클릭베이트 (2026-07-16 YouTube 실수확 'trading bot CRUSHING 24/7' 반영)
+    r"crushing",
+    r"\b\d+/7\b",
+    r"to the moon",
+    r"passive income",
+    r"get rich",
+    r"insane\s+(?:gains?|returns?|profit|money)",
     _EMOJI_RUN,
 ]
 FOMO_PATTERNS = [re.compile(p) for p in _FOMO_RAW]
