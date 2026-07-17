@@ -1,7 +1,7 @@
-"""harness_stats.py — 하네스 A/B 결과에 '통계적 신뢰'를 부여하는 계측기.
+"""eval_stats.py — 계측기 A/B 결과에 '통계적 신뢰'를 부여하는 계측기.
 
 WHY (다른 Claude·회장 지적):
-  현 하네스는 스킬당 N=1 생성(1쌍을 judge 3명이 채점) + avgDelta 0.35 같은 point
+  현 계측기는 스킬당 N=1 생성(1쌍을 judge 3명이 채점) + avgDelta 0.35 같은 point
   estimate 단독. 표본크기·신뢰구간이 없어 '노이즈를 신호로 착각'할 위험 — 이 위에
   헌법개정을 결정하면 거짓 표본 위에 서는 것. 이 모듈이 두 축으로 그걸 막는다:
 
@@ -18,9 +18,9 @@ WHY (다른 Claude·회장 지적):
 재현성: 부트스트랩은 seed 고정.
 
 사용:
-  python harness_stats.py --reanalyze data/2026-07-01_panel_raw.json   # MODE1 재분석 리포트
-  python harness_stats.py --selftest                                    # 통계 정확성 자가검증
-소유: CAR / ARD Harness. 관련: PROJECT.md, results/, [[project-ard-harness]]
+  python eval_stats.py --reanalyze data/2026-07-01_panel_raw.json   # MODE1 재분석 리포트
+  python eval_stats.py --selftest                                    # 통계 정확성 자가검증
+소유: CAR / ARD 계측기. 관련: PROJECT.md, results/, [[project-ard-eval]]
 """
 from __future__ import annotations
 
@@ -159,7 +159,7 @@ def reanalyze(raw_path: Path) -> dict:
 
 # ════════════════════════════════════════════════════════════════════════
 def _print_reanalysis(r: dict) -> None:
-    print(f"# 하네스 재분석 (통계 신뢰등급) — {r['experiment']}")
+    print(f"# 계측기 재분석 (통계 신뢰등급) — {r['experiment']}")
     print(f"생성 반복 N = {r['reps_per_skill']}/스킬  → N=1은 생성분산 미측정. "
           f"신뢰신호 = judge 일치도 x |Δ| 뿐.\n")
     print(f"{'스킬':26} {'판정':7} {'패널':9} {'Δ':6} {'일치':5} {'신뢰등급'}")
