@@ -157,12 +157,67 @@ def archive_evicted(results, items_by_file):
     return moved
 
 
+def apply_l2(verdicts_path):
+    """L2(CAR 구조판정) 결과를 큐에 반영 — 판정만 하고 큐에 두면 '소화'가 아니다.
+       EVICT→evicted/ · APPROVAL→approval/(회장 판단 대기) · APPLY→큐 잔류(프로브 검증 전엔 적용 불가).
+       각 항목에 claim/baseline_covered/required_probe/reason을 박아 판정 근거를 영구 보존."""
+    try:
+        data = json.loads(Path(verdicts_path).read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"[apply-l2] 판정 파일 읽기 실패: {e}")
+        return {}
+    items = data.get("items") or []
+    dests = {"EVICT": ARD_DIR / "evicted", "APPROVAL": ARD_DIR / "approval"}
+    moved = {"EVICT": 0, "APPROVAL": 0, "APPLY": 0, "미발견": 0}
+    for v in items:
+        vid, verdict = v.get("id"), (v.get("verdict") or "").upper()
+        src = QUEUE_DIR / f"{vid}.json"
+        if not src.exists():
+            moved["미발견"] += 1
+            continue
+        if verdict == "APPLY":          # 프로브 검증 통과 전엔 큐에 남긴다(생성≠검증)
+            moved["APPLY"] += 1
+            continue
+        dest_dir = dests.get(verdict)
+        if not dest_dir:
+            continue
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            d = json.loads(src.read_text(encoding="utf-8"))
+            d.update({
+                "l2_verdict": verdict,
+                "l2_claim": v.get("claim"),
+                "l2_g2_applies_to": v.get("g2_applies_to"),
+                "l2_baseline_covered": v.get("baseline_covered"),
+                "l2_required_probe": v.get("required_probe"),
+                "l2_reason": v.get("reason"),
+                "l2_at": now_iso(),
+            })
+            (dest_dir / src.name).write_text(
+                json.dumps(d, indent=2, ensure_ascii=False), encoding="utf-8")
+            src.unlink()
+            moved[verdict] += 1
+        except Exception:
+            continue
+    return moved
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--review", action="store_true", help="L2 판정 대상만 출력")
     ap.add_argument("--apply", action="store_true",
                     help="EVICT 판정분을 큐 → evicted/ 로 실제 배출(되돌릴 수 있음)")
+    ap.add_argument("--apply-l2", metavar="VERDICTS_JSON",
+                    help="L2(CAR) 구조판정 결과를 큐에 반영: EVICT→evicted/, APPROVAL→approval/")
     args = ap.parse_args()
+
+    if args.apply_l2:
+        m = apply_l2(args.apply_l2)
+        remain = len(list(QUEUE_DIR.glob("*.json")))
+        print(f"[apply-l2] EVICT {m.get('EVICT',0)} → evicted/ · APPROVAL {m.get('APPROVAL',0)} → approval/ "
+              f"· APPLY {m.get('APPLY',0)} 큐잔류(프로브 대기) · 미발견 {m.get('미발견',0)}")
+        print(f"           큐 잔여 {remain}건")
+        return 0
 
     items = load_items()
     if not items:
