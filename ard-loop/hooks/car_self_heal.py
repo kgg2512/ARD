@@ -59,6 +59,8 @@ HARVESTER = ARD_DIR / "harvester" / "car_harvester.py"
 GH_HARVESTER = ARD_DIR / "harvester" / "car_github_harvester.py"
 SUPERVISOR = ARD_DIR / "hooks" / "car_supervisor.py"
 REPORTS_DIR = ARD_DIR / "reports"                   # supervisor가 쓰는 <date>_health.json
+TRIAGE = ARD_DIR / "gate" / "digest_triage.py"      # 큐 판정·잡음 배출(소화 하네스 L1)
+TRIAGE_DIR = ARD_DIR / "triage"
 
 # 임계값 (schtask 매일 실행 가정 — 하루 놓쳐도 다음날 복구되게 여유)
 STALE_YT_H = 30       # YT 수확 신선 기준 (24h 스케줄 + 여유)
@@ -66,7 +68,8 @@ STALE_GH_H = 18       # GH 수확 신선 기준 (12h 스케줄 + 여유)
 STALE_SUP_H = 30      # 감독 신선 기준
 BACKLOG_GATE = 20     # 큐 적체 escalate 게이트 (supervisor VALUE_REVIEW_GATE와 정합)
 SURFACE_STALE_H = 48  # 큐가 쌓였는데 이 시간 이상 surface/push 없었으면 = 조용히 방치 → escalate
-MAX_ITERS = 6         # GOAP 수렴 상한(무한루프 방지)
+TRIAGE_STALE_H = 24   # 큐 판정(잡음 배출) 신선 기준
+MAX_ITERS = 8         # GOAP 수렴 상한(무한루프 방지 — 액션 수보다 크게)
 
 
 def now():
@@ -171,6 +174,19 @@ def add_persistent_notice(text, max_shows=5):
         pass
 
 
+def _triage_age():
+    """마지막 큐 판정(triage) 이후 경과시간. 원장 파일 mtime 기준."""
+    try:
+        files = sorted(TRIAGE_DIR.glob("*_triage.json"))
+        if not files:
+            return None
+        import os
+        mt = datetime.fromtimestamp(os.path.getmtime(files[-1]), timezone.utc)
+        return (now() - mt).total_seconds() / 3600
+    except Exception:
+        return None
+
+
 def read_supervisor_health():
     """supervisor가 쓴 최신 health.json의 종합 건강도(GREEN/YELLOW/RED) 반환.
        self_heal의 3개 GOAP 목표는 '부품이 도는가'만 보고, supervisor는 '루프가 값을 내는가'
@@ -204,6 +220,7 @@ def measure():
         "sup_age": hours_since(load(SUP_STATE_FILE, {}).get("last_run")),
         "queue": qn,
         "surface_age": min(ages) if ages else None,
+        "triage_age": _triage_age(),
     }
     return ws
 
@@ -228,10 +245,20 @@ def g_surfaced(ws):
     return ws["surface_age"] is not None and ws["surface_age"] < SURFACE_STALE_H
 
 
+def g_queue_triaged(ws):
+    """큐에 잡음이 방치되지 않음 = 최근 triage(판정·배출)가 돌았나.
+       (2026-07-20 추가 — 회장 '큐를 판단·검증할 하네스' 요구. 스킬 ard-self-heal §3
+        '새 목표+액션 1개 추가' 절차를 그대로 적용한 확장 실증.)"""
+    if ws["queue"] == 0:
+        return True
+    return ws["triage_age"] is not None and ws["triage_age"] < TRIAGE_STALE_H
+
+
 GOALS = [
     ("fresh_harvest", g_fresh_harvest),
     ("supervision_live", g_supervision_live),
     ("surfaced", g_surfaced),
+    ("queue_triaged", g_queue_triaged),
 ]
 
 
@@ -267,6 +294,14 @@ def a_escalate_backlog(ws):
     return True, f"escalate: push={'OK' if pushed else '미설정'} + 영속 notice"
 
 
+def a_triage_queue(ws):
+    """큐를 판정하고 잡음(EVICT)을 evicted/로 배출 — 판정 근거를 항목에 박아 되돌릴 수 있게.
+       기계가 할 수 있는 소화는 기계가 한다(LLM은 남은 신호에만 쓴다)."""
+    ok, note = run_script(TRIAGE, ["--apply"], timeout=90)
+    tail = [l for l in note.splitlines() if "[apply]" in l or "판정 →" in l]
+    return ok, f"큐 판정·배출 → {tail[-1].strip() if tail else note[:80]}"
+
+
 ACTIONS = [
     # (name, precondition(ws)->bool, run, targets)
     ("reharvest_yt", lambda ws: ws["net"] and (ws["yt_age"] is None or ws["yt_age"] >= STALE_YT_H),
@@ -275,6 +310,9 @@ ACTIONS = [
      a_reharvest_gh, "fresh_harvest"),
     ("run_supervisor", lambda ws: ws["sup_age"] is None or ws["sup_age"] >= STALE_SUP_H,
      a_run_supervisor, "supervision_live"),
+    ("triage_queue", lambda ws: ws["queue"] > 0 and
+     (ws["triage_age"] is None or ws["triage_age"] >= TRIAGE_STALE_H),
+     a_triage_queue, "queue_triaged"),
     ("escalate_backlog", lambda ws: ws["queue"] >= BACKLOG_GATE and
      (ws["surface_age"] is None or ws["surface_age"] >= SURFACE_STALE_H),
      a_escalate_backlog, "surfaced"),

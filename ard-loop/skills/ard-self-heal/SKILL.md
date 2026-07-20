@@ -71,6 +71,24 @@ print("복구됨" if json.load(open(S))["last_run"]!="2026-07-10T00:00:00+00:00"
 ```
 기대: self_heal이 감지→액션→`GREEN` 수렴, 원장(`self_heal.jsonl`)에 action 기록, 2회차 조용(멱등).
 
+## 4.5 큐를 판단·검증하는 소화 하네스 (4층) — "수확만 되고 소화가 멎을 때"
+> 회장 질문(2026-07-20) "큐 N건을 판단하고 검증할 방법이나 하네스는?"의 답.
+> 부품(usefulness_gate·claim_verifier·check_adoption)은 있었으나 **쌓인 큐 전체에 대한
+> 판정 패스가 없어 조립이 안 돼 있었다.** 아래 4층이 그 조립.
+
+| 층 | 무엇 | 도구 | 비용 |
+|---|---|---|---|
+| **L1 기계 분류** | 명백한 잡음을 근거와 함께 배출 | `gate/digest_triage.py --apply` | LLM 0원 |
+| **L2 LLM 판정** | 남은 신호만 구조 판정(자유서술 금지) | CAR 소환 | 토큰 |
+| **L3 주장 검증** | required_probe 실행 전엔 VERIFIED 불가 | `gate/claim_verifier.py` | 프로브 |
+| **L4 사후 채택** | 적용 후 7일+ 0회 호출 = 판정 오류 신호 | `car_supervisor.check_adoption` | 자동 |
+
+- **L1 판별자는 '길이'가 아니라 '주제 밀도'** — 실측: 악성코드 인터뷰 43k자(밀도 8.0) < 에이전트 기법 17k자(밀도 176). `topic_density()`가 G2 코어 용어를 가중 집계. 잡음은 `evicted/`로 **이동(삭제 아님)** + `triage_reason` 박아 사후 반박 가능.
+- **L2 판정 계약(필수 구조)**: `claim` / `g2_applies_to` / `baseline_covered` / `required_probe` / `verdict(APPLY·APPROVAL·EVICT)`. **`baseline_covered=true`면 무조건 EVICT**(교리: "추가는 baseline 이길 때만"). **대다수 EVICT가 정상 출력** — 억지 APPLY 금지.
+- **L3 불변식**: 프로브 결과 없이는 어떤 주장도 VERIFIED 안 됨 → 적용 불가. 소스 텍스트는 증거가 아니다.
+- **L4가 하네스를 자기교정**: APPLY로 판정해 적용한 게 안 쓰이면 L2 판정 기준이 틀린 것.
+- **자동화**: self_heal GOAP에 `queue_triaged` 목표 + `triage_queue` 액션으로 편입 → 매일 기계 소화가 자동 수행. (이 편입 자체가 §3 확장 절차의 실사용 예.)
+
 ## 5. 마무리
 - 커밋: `Desktop/ARD` 레포 `git add -A && git commit && git push origin master`.
 - 배포 정합성: `md5sum` 레포 vs `~/.claude/ard/` 일치 확인.
