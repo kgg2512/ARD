@@ -31,6 +31,7 @@ CAR Self-Heal — ARD 루프의 자가치유 하네스 (GOAP 엔진).
 실행: Task Scheduler 매일(신뢰 heartbeat) + car_dispatch가 세션에서 보조 호출.
 """
 import json
+import os
 import subprocess
 import sys
 import socket
@@ -69,6 +70,28 @@ STALE_SUP_H = 30      # 감독 신선 기준
 BACKLOG_GATE = 20     # 큐 적체 escalate 게이트 (supervisor VALUE_REVIEW_GATE와 정합)
 SURFACE_STALE_H = 48  # 큐가 쌓였는데 이 시간 이상 surface/push 없었으면 = 조용히 방치 → escalate
 TRIAGE_STALE_H = 24   # 큐 판정(잡음 배출) 신선 기준
+
+# ── 자동화 생존성 감시(watchdog) — 2026-07-20 회장 지시 ──────────────────────
+# 계통 문제: G2에 "설치했다"고 기록된 자동화가 실제로는 조용히 안 돈다.
+#   실측 3건: car_dispatch 8일 미발화 / skill_usage_logger matcher 매칭실패 /
+#             curator_check 36일 미발화 (+ skill_updater 34일).
+#   전부 "훅은 등록됐는데 발화 안 함" — 훅 발화에 의존하는 자동화는 조용히 죽는다.
+# 해법: 각 자동화의 '고유 흔적'을 감시하다 stale하면 **신뢰 경로(schtask)의 self_heal이
+#       직접 대신 실행**한다. 훅이 죽어도 자동화는 산다.
+# 확장: 새 자동화는 이 표에 1줄 추가하면 그때부터 감시·소생 대상이 된다.
+_H = Path.home() / ".claude"
+WATCHDOG = [
+    # (이름, 흔적파일, stale 기준(h), 실행할 스크립트, stdin 필요, heavy)
+    #   heavy=True → 백그라운드 발사(비차단). self_heal(매일 heartbeat)이 8분 스크립트에
+    #   블로킹되면 안 되므로, 무거운 소생은 띄우기만 하고 흔적 갱신은 다음 사이클에 확인한다.
+    ("curator",       _H / "curator_state.json",       96,  _H / "hooks" / "curator_check.py", True,  False),
+    ("skill_updater", _H / "skill_updater_state.json", 168, _H / "hooks" / "skill_updater.py", True,  True),
+]
+HOOK_PAYLOAD = '{"hook_event_name":"SessionStart","source":"self_heal","cwd":"%s","session_id":"self_heal"}' % (
+    str(Path.home()).replace("\\", "\\\\"))
+REVIVE_STATE = ARD_DIR / "self_heal_revive.json"  # 자동화별 마지막 소생 시도·연속실패 streak
+RETRY_H = 20          # 소생 재시도 억제 주기(흔적 갱신 대기) — 나깅 방지
+DEAD_STREAK = 3       # 소생 N회 연속 실패 = 진짜 고장 → 회장 escalate
 MAX_ITERS = 8         # GOAP 수렴 상한(무한루프 방지 — 액션 수보다 크게)
 
 
@@ -126,17 +149,35 @@ def net_up(host="www.youtube.com"):
         return False
 
 
-def run_script(path, args=None, timeout=120):
-    """스크립트를 서브프로세스로 실행. (ok, note) 반환. self_heal 자신은 죽지 않음."""
+def run_script(path, args=None, timeout=120, stdin_payload=None):
+    """스크립트를 서브프로세스로 실행. (ok, note) 반환. self_heal 자신은 죽지 않음.
+       stdin_payload: 훅 스크립트는 json.load(sys.stdin)을 기대하므로 소생 시 페이로드 주입."""
     if not Path(path).exists():
         return False, "missing"
     try:
         p = subprocess.run([sys.executable, str(path)] + (args or []),
-                           capture_output=True, text=True, encoding="utf-8",
-                           errors="replace", timeout=timeout)
+                           input=stdin_payload, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=timeout)
         return (p.returncode == 0), (p.stdout or "").strip()[-400:]
     except Exception as e:
         return False, str(e)
+
+
+def stale_automations():
+    """watchdog 대상 중 흔적이 오래된(=미발화 의심) 자동화 목록.
+       반환 [(name, age_hours 또는 None, script, needs_stdin, heavy)]"""
+    out = []
+    for name, trace, stale_h, script, needs_stdin, heavy in WATCHDOG:
+        age = None
+        try:
+            if trace.exists():
+                age = (now() - datetime.fromtimestamp(
+                    os.path.getmtime(trace), timezone.utc)).total_seconds() / 3600
+        except Exception:
+            age = None
+        if age is None or age >= stale_h:
+            out.append((name, age, script, needs_stdin, heavy))
+    return out
 
 
 def push(text):
@@ -221,6 +262,7 @@ def measure():
         "queue": qn,
         "surface_age": min(ages) if ages else None,
         "triage_age": _triage_age(),
+        "stale_autos": [a[0] for a in stale_automations()],
     }
     return ws
 
@@ -254,11 +296,17 @@ def g_queue_triaged(ws):
     return ws["triage_age"] is not None and ws["triage_age"] < TRIAGE_STALE_H
 
 
+def g_automations_alive(ws):
+    """감시 대상 자동화가 전부 최근에 돌았나. 훅 미발화로 조용히 죽는 계통 문제 방어."""
+    return not ws["stale_autos"]
+
+
 GOALS = [
     ("fresh_harvest", g_fresh_harvest),
     ("supervision_live", g_supervision_live),
     ("surfaced", g_surfaced),
     ("queue_triaged", g_queue_triaged),
+    ("automations_alive", g_automations_alive),
 ]
 
 
@@ -302,6 +350,82 @@ def a_triage_queue(ws):
     return ok, f"큐 판정·배출 → {tail[-1].strip() if tail else note[:80]}"
 
 
+def a_revive_automations(ws):
+    """미발화 자동화를 self_heal이 직접 실행 — 훅 발화에 의존하지 않는 소생 경로.
+       (훅이 죽어도 신뢰 경로 schtask에서 도는 self_heal이 대신 돌려준다.)
+       streak 추적: 소생을 시도했는데도 흔적이 계속 stale이면(진짜 고장) DEAD_STREAK회 후 escalate."""
+    st = load(REVIVE_STATE, {})
+    # 지난 시도가 흔적을 갱신했는지로 성공/실패 판정 → 연속 실패 streak 집계.
+    for name, trace, stale_h, script, needs_stdin, heavy in WATCHDOG:
+        rec = st.get(name, {})
+        la = rec.get("last_attempt")
+        if la:  # 시도했었다면: 흔적이 그 시도 이후로 갱신됐나
+            try:
+                tmt = datetime.fromtimestamp(os.path.getmtime(trace), timezone.utc) if trace.exists() else None
+            except Exception:
+                tmt = None
+            attempt_dt = datetime.fromisoformat(la)
+            if tmt and tmt > attempt_dt:      # 갱신됨 = 소생 성공
+                rec["streak"] = 0
+            elif hours_since(la) and hours_since(la) > RETRY_H:  # 재시도 주기 지났는데 여전히 안 갱신 = 실패
+                rec["streak"] = rec.get("streak", 0) + 1
+            st[name] = rec
+
+    revived, launched, failed = [], [], []
+    for name, age, script, needs_stdin, heavy in stale_automations():
+        rec = st.get(name, {})
+        # 재시도 억제: 최근 RETRY_H 내 시도했으면 이번엔 건너뜀(흔적 갱신 대기 중)
+        if rec.get("last_attempt") and (hours_since(rec["last_attempt"]) or 999) < RETRY_H:
+            continue
+        agestr = "흔적없음" if age is None else f"{age/24:.0f}일"
+        if heavy:
+            # 무거운 자동화는 발사만 하고 기다리지 않는다(self_heal은 매일 heartbeat라 블로킹 금지).
+            # 흔적 갱신 여부는 다음 사이클이 확인한다 — 계속 stale이면 그때 진짜 고장으로 escalate.
+            try:
+                subprocess.Popen(
+                    [sys.executable, str(script)],
+                    stdin=subprocess.DEVNULL if not needs_stdin else subprocess.PIPE,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                launched.append(f"{name}({agestr})")
+                ok = True
+            except Exception:
+                failed.append(f"{name}({agestr})")
+                ok = False
+            log_heal("revive_automation", name=name, mode="background",
+                     stale_days=(None if age is None else round(age/24, 1)), ok=ok)
+            continue
+        ok, note = run_script(script, [], timeout=120,
+                              stdin_payload=HOOK_PAYLOAD if needs_stdin else None)
+        (revived if ok else failed).append(f"{name}({agestr})")
+        log_heal("revive_automation", name=name, mode="sync",
+                 stale_days=(None if age is None else round(age/24, 1)), ok=ok)
+        st.setdefault(name, {})["last_attempt"] = now_iso()
+
+    # 발사한 heavy 건도 시도 기록
+    for name, age, script, needs_stdin, heavy in stale_automations():
+        if heavy and any(name in l for l in launched):
+            st.setdefault(name, {})["last_attempt"] = now_iso()
+    save(REVIVE_STATE, st)
+
+    # 진짜 고장(소생해도 계속 stale) — DEAD_STREAK 도달분만 out-of-band escalate(중복 방지).
+    dead = [n for n, r in st.items() if r.get("streak", 0) >= DEAD_STREAK]
+    if dead:
+        msg = (f"🔴 [ARD 자가치유] 자동화 소생 실패 {DEAD_STREAK}회+: {', '.join(dead)}. "
+               f"self_heal이 대신 실행해도 흔적이 안 갱신됨 = 스크립트 자체 고장 의심 → 회장/Alpha 점검 필요.")
+        push(msg)
+        add_persistent_notice(msg, max_shows=5)
+        for n in dead:
+            st[n]["streak"] = 0  # escalate 후 리셋(스팸 방지)
+        save(REVIVE_STATE, st)
+        log_heal("escalate_dead_automation", dead=dead)
+
+    parts = []
+    if revived: parts.append("소생 " + ", ".join(revived))
+    if launched: parts.append("백그라운드 발사 " + ", ".join(launched))
+    if failed: parts.append("실패 " + ", ".join(failed))
+    return (not failed), ("자동화 " + " · ".join(parts) if parts else "대기(재시도 억제 중)")
+
+
 ACTIONS = [
     # (name, precondition(ws)->bool, run, targets)
     ("reharvest_yt", lambda ws: ws["net"] and (ws["yt_age"] is None or ws["yt_age"] >= STALE_YT_H),
@@ -313,6 +437,8 @@ ACTIONS = [
     ("triage_queue", lambda ws: ws["queue"] > 0 and
      (ws["triage_age"] is None or ws["triage_age"] >= TRIAGE_STALE_H),
      a_triage_queue, "queue_triaged"),
+    ("revive_automations", lambda ws: bool(ws["stale_autos"]),
+     a_revive_automations, "automations_alive"),
     ("escalate_backlog", lambda ws: ws["queue"] >= BACKLOG_GATE and
      (ws["surface_age"] is None or ws["surface_age"] >= SURFACE_STALE_H),
      a_escalate_backlog, "surfaced"),
@@ -399,6 +525,8 @@ def main():
     if health != "GREEN" or actions_taken:
         print(f"[ARD 자가치유] 통합 {health} (기계 {mech}·소화 {sup or 'n/a'}) | "
               f"초기 미충족: {initial_unmet or '없음'} | 조치 {len(actions_taken)}건 | 잔여: {remaining or '없음'}")
+        if final_ws.get("stale_autos"):
+            print(f"  ⚠️ 소생 실패한 자동화: {', '.join(final_ws['stale_autos'])}")
         for a in actions_taken:
             print(f"  - {a['action']}: {'OK' if a['ok'] else 'FAIL'} {a['note']}")
         if sup == "RED" and mech == "GREEN":

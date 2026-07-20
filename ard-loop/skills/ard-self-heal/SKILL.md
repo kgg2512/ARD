@@ -104,6 +104,23 @@ EVICT 7건을 적대적 재검증한 결과 **오판 2건 + 근거오류 1건** 
 - **절차**: L2 판정 후 EVICT 표본에 대해 독립 에이전트(CAR 아닌 다른 계열)에게 **"이 EVICT를 반박하라"**를 시킨다. 기본값은 회의(skeptical) — "판정이 맞다"는 결론은 실제 확인 후에만. 오판 발견 시 `l2_overturned` 박아 큐로 복원.
 - **자동화**: self_heal GOAP에 `queue_triaged` 목표 + `triage_queue` 액션으로 편입 → 매일 기계 소화가 자동 수행. (이 편입 자체가 §3 확장 절차의 실사용 예.)
 
+## 4.6 자동화 생존성 감시(watchdog) — "설치했는데 안 도는" 계통 문제
+> 회장 지시(2026-07-20). 이 세션에서만 **"등록됐는데 발화 안 함"을 3건** 발견:
+> car_dispatch 8일 / skill_usage_logger matcher 매칭실패 / curator_check 36일(+skill_updater 34일).
+> "설치했다"는 기록과 "실제로 돈다"는 현실의 괴리 = G2 인프라 계통 문제.
+
+- **self_heal `WATCHDOG` 레지스트리**: `(이름, 흔적파일, stale_h, 스크립트, stdin필요, heavy)`.
+  각 자동화의 고유 흔적을 감시하다 stale하면 **self_heal이 직접 대신 실행**(훅 발화 비의존).
+  **새 자동화는 이 표에 1줄 추가** = 그때부터 감시·소생 대상. (§3 확장의 인프라판.)
+- **heavy=True**(예: skill_updater 8분) → **백그라운드 발사**(비차단). self_heal은 매일 heartbeat라
+  무거운 소생에 블로킹되면 안 됨. 흔적 갱신은 다음 사이클이 확인.
+- **streak 추적**(`self_heal_revive.json`): 소생해도 흔적이 계속 stale이면 = 진짜 고장.
+  `RETRY_H`로 재시도 억제(나깅 방지), `DEAD_STREAK`회 연속 실패 시 Telegram+notice escalate.
+- **로거 유실 검증**(회장 "큐레이터가 잘 되는지 검증"): `car_supervisor.check_skill_logger`가
+  always-on dashboard 로거(전 도구)와 skill_usage 로거를 **7일 창으로 교차대조**. dashboard엔
+  Skill이 있는데 usage엔 없으면 = 로거 유실 = **큐레이터 판단근거 오염** → health.json FAIL.
+  (이번 matcher 버그를 자동 감지하도록 설계 — 재발 시 즉시 잡힌다. 양성/음성 실측 통과.)
+
 ## 5. 마무리
 - 커밋: `Desktop/ARD` 레포 `git add -A && git commit && git push origin master`.
 - 배포 정합성: `md5sum` 레포 vs `~/.claude/ard/` 일치 확인.
