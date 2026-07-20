@@ -3,20 +3,210 @@
   "harvest": {
     "max_per_channel": 5,
     "interval_hours": 24,
-    "transcript_languages": ["en", "ko"],
+    "transcript_languages": [
+      "en",
+      "ko"
+    ],
     "relevance_keywords": [
-      "claude code", "claude agent", "mcp", "model context protocol",
-      "ai agent", "ai orchestra", "agent orchestration", "multi-agent",
-      "subagent", "agentic", "skill", "workflow", "automation",
-      "cursor", "windsurf", "n8n", "langgraph", "autogen", "crewai",
+      "claude code",
+      "claude agent",
+      "mcp",
+      "model context protocol",
+      "ai agent",
+      "ai orchestra",
+      "agent orchestration",
+      "multi-agent",
+      "subagent",
+      "agentic",
+      "skill",
+      "workflow",
+      "automation",
+      "cursor",
+      "windsurf",
+      "n8n",
+      "langgraph",
+      "autogen",
+      "crewai",
       "vibe coding"
     ]
   },
   "youtube": [
-    { "name": "All About AI",   "channel_id": "UCR9j1jqqB5Rse69wjUnbYwA", "handle": "@AllAboutAI",   "priority": "high",   "active": true, "note": "Claude Code MCP/Skill 전문" },
-    { "name": "Fireship",       "channel_id": "UCsBjURrPoezykLs9EqgamOA", "handle": "@Fireship",     "priority": "medium", "active": true, "note": "AI 트렌드 즉각 반응" },
-    { "name": "Dave Ebbelaar",  "channel_id": "UCn8ujwUInbJkBhffxqAPBVQ", "handle": "@daveebbelaar", "priority": "high",   "active": true, "note": "MCP 실습 튜토리얼" },
-    { "name": "Liam Ottley",    "channel_id": "UCui4jxDaMb53Gdh-AZUTPAg", "handle": "@LiamOttley",   "priority": "low",    "active": false, "note": "OFF 2026-07-12 — 큐 배출서 5/5 수익낚시 클릭베이트 evict. 기술신호 낮아 조준 제외(회장 지시)" }
+    {
+      "name": "All About AI",
+      "channel_id": "UCR9j1jqqB5Rse69wjUnbYwA",
+      "handle": "@AllAboutAI",
+      "priority": "high",
+      "active": true,
+      "note": "Claude Code MCP/Skill 전문"
+    },
+    {
+      "name": "Fireship",
+      "channel_id": "UC2Xd-TjJByJyK2w1zNwY0zQ",
+      "handle": "@Fireship",
+      "priority": "medium",
+      "active": true,
+      "note": "AI 트렌드 즉각 반응"
+    },
+    {
+      "name": "Dave Ebbelaar",
+      "channel_id": "UCn8ujwUInbJkBhffxqAPBVQ",
+      "handle": "@daveebbelaar",
+      "priority": "high",
+      "active": true,
+      "note": "MCP 실습 튜토리얼"
+    },
+    {
+      "name": "IndyDevDan",
+      "channel_id": "UC_x36zCEGilGpB1m-V4gmjg",
+      "handle": "@indydevdan",
+      "priority": "high",
+      "active": true,
+      "note": "Claude Code·에이전틱 코딩 심층"
+    },
+    {
+      "name": "Cole Medin",
+      "channel_id": "UCMwVTLZIRRUyyVrkjDpn4pA",
+      "handle": "@ColeMedin",
+      "priority": "high",
+      "active": true,
+      "note": "AI 에이전트·MCP·RAG 실전"
+    },
+    {
+      "name": "Sam Witteveen",
+      "channel_id": "UC55ODQSvARtgSyc8ThfiepQ",
+      "handle": "@samwitteveenai",
+      "priority": "high",
+      "active": true,
+      "note": "에이전트·LangGraph·툴콜"
+    },
+    {
+      "name": "AI Jason",
+      "channel_id": "UCrXSVX9a1mj8l0CMLwKgMVw",
+      "handle": "@AIJasonZ",
+      "priority": "high",
+      "active": true,
+      "note": "Claude·에이전트 빌드"
+    },
+    {
+      "name": "Matthew Berman",
+      "channel_id": "UCawZsQWqfGSbCI5yjkdVkTA",
+      "handle": "@matthew_berman",
+      "priority": "medium",
+      "active": true,
+      "note": "AI 뉴스·모델·에이전트 데모"
+    },
+    {
+      "name": "Prompt Engineering",
+      "channel_id": "UCDq7SjbgRKty5TgGafW8Clg",
+      "handle": "@engineerprompt",
+      "priority": "medium",
+      "active": true,
+      "note": "RAG·LLM·로컬 에이전트"
+    },
+    {
+      "name": "Wes Roth",
+      "channel_id": "UCqcbQf6yw5KzRoDDcZ_wBSw",
+      "handle": "@WesRoth",
+      "priority": "low",
+      "active": true,
+      "note": "AI 뉴스(하이프 비중 있음)"
+    },
+    {
+      "name": "Matt Wolfe",
+      "channel_id": "UChpleBmo18P08aKCIgti38g",
+      "handle": "@mreflow",
+      "priority": "low",
+      "active": true,
+      "note": "AI 툴 뉴스"
+    },
+    {
+      "name": "AI Explained",
+      "channel_id": "UCNJ1Ymd5yFuUPtn21xtRbbw",
+      "handle": "@aiexplained-official",
+      "priority": "medium",
+      "active": true,
+      "note": "모델·논문 분석"
+    },
+    {
+      "name": "Yannic Kilcher",
+      "channel_id": "UCHmD-oSpV0sNfAUnpYpj8KA",
+      "handle": "@YannicKilcher",
+      "priority": "medium",
+      "active": true,
+      "note": "논문 심층"
+    },
+    {
+      "name": "Two Minute Papers",
+      "channel_id": "UCbfYPyITQ-7l4upoX8nvctg",
+      "handle": "@TwoMinutePapers",
+      "priority": "low",
+      "active": true,
+      "note": "연구 요약"
+    },
+    {
+      "name": "Nicholas Renotte",
+      "channel_id": "UCHXa4OpASJEwrHrLeIzw7Yg",
+      "handle": "@NicholasRenotte",
+      "priority": "medium",
+      "active": true,
+      "note": "ML·에이전트 빌드"
+    },
+    {
+      "name": "Tina Huang",
+      "channel_id": "UC2UXDak6o7rBm23k3Vv5dww",
+      "handle": "@TinaHuang1",
+      "priority": "low",
+      "active": true,
+      "note": "데이터·AI 커리어/툴"
+    },
+    {
+      "name": "Greg Isenberg",
+      "channel_id": "UCPjNBjflYl0-HQtUvOx0Ibw",
+      "handle": "@GregIsenberg",
+      "priority": "medium",
+      "active": true,
+      "note": "AI 스타트업·에이전트 활용"
+    },
+    {
+      "name": "Theo - t3.gg",
+      "channel_id": "UCtuO2h6OwDueF7h3p8DYYjQ",
+      "handle": "@t3dotgg",
+      "priority": "medium",
+      "active": true,
+      "note": "개발·AI 코딩 도구"
+    },
+    {
+      "name": "NetworkChuck",
+      "channel_id": "UCOuGATIAbd2DvzJmUgXn2IQ",
+      "handle": "@NetworkChuck",
+      "priority": "low",
+      "active": true,
+      "note": "가끔 AI/자동화/에이전트"
+    },
+    {
+      "name": "Nate Herk | AI Automation",
+      "channel_id": "UC2ojq-nuP8ceeHqiroeKhBA",
+      "handle": "@nateherk",
+      "priority": "medium",
+      "active": true,
+      "note": "n8n·AI 자동화 워크플로"
+    },
+    {
+      "name": "David Ondrej",
+      "channel_id": "UCPGrgwfbkjTIgPoOh2q1BAg",
+      "handle": "@DavidOndrej",
+      "priority": "medium",
+      "active": true,
+      "note": "에이전트·바이브코딩"
+    },
+    {
+      "name": "Liam Ottley",
+      "channel_id": "UCui4jxDaMb53Gdh-AZUTPAg",
+      "handle": "@LiamOttley",
+      "priority": "low",
+      "active": false,
+      "note": "OFF 2026-07-12 — 수익낚시 클릭베이트 evict(회장 지시)"
+    }
   ],
   "github": {
     "_comment": "릴리스/커밋 추적 + 트렌딩 검색. CAR이 신규 스킬/MCP/에이전트 후보 발굴. GITHUB_TOKEN 있으면 rate↑(없어도 60/h 동작).",
@@ -46,17 +236,29 @@
   "reporting": {
     "_comment": "Mariah 'Reports via Telegram' 이식. 토큰은 환경변수(ARD_TELEGRAM_TOKEN/CHAT_ID), 레포에 키 금지.",
     "channel": "telegram",
-    "push_on": ["supervisor_yellow_red", "car_digest"],
+    "push_on": [
+      "supervisor_yellow_red",
+      "car_digest"
+    ],
     "fallback": "session_context_and_file"
   },
   "apply_policy": {
     "_comment": "🔒 CSO 게이트: 아래 출처 + 설치수 1K+ 만 자동적용. 그 외는 회장 승인 큐.",
     "trusted_publishers": [
-      "anthropics", "anthropic-ai", "modelcontextprotocol", "vercel-labs",
-      "microsoft", "supabase", "cloudflare", "stripe", "upstash", "github"
+      "anthropics",
+      "anthropic-ai",
+      "modelcontextprotocol",
+      "vercel-labs",
+      "microsoft",
+      "supabase",
+      "cloudflare",
+      "stripe",
+      "upstash",
+      "github"
     ],
     "min_installs_for_auto": 1000,
     "auto_apply": true,
     "require_approval_for_settings_json": true
-  }
+  },
+  "_channel_expansion": "2026-07-20: 3→21 채널 확대(회장 지시). handle→channel_id 해석+RSS 실검증 통과분만. 관련성 게이트가 런타임에 비관련 영상 필터."
 }

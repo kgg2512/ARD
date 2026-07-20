@@ -33,7 +33,9 @@ Copy-Item (Join-Path $loop 'harvester\car_harvester.py')       (Join-Path $ardOp
 Copy-Item (Join-Path $loop 'harvester\car_github_harvester.py') (Join-Path $ardOps 'harvester\car_github_harvester.py') -Force
 Copy-Item (Join-Path $loop 'hooks\car_dispatch.py')            (Join-Path $ardOps 'hooks\car_dispatch.py') -Force
 Copy-Item (Join-Path $loop 'hooks\car_supervisor.py')      (Join-Path $ardOps 'hooks\car_supervisor.py') -Force
+Copy-Item (Join-Path $loop 'hooks\car_self_heal.py')       (Join-Path $ardOps 'hooks\car_self_heal.py') -Force
 Copy-Item (Join-Path $loop 'hooks\car_dispatch.py')        (Join-Path $hooksDir 'car_dispatch.py') -Force
+Copy-Item (Join-Path $loop 'hooks\ard_gov_check.py')       (Join-Path $hooksDir 'ard_gov_check.py') -Force -ErrorAction SilentlyContinue
 Copy-Item (Join-Path $loop 'pull\car_pull.py')             (Join-Path $ardOps 'pull\car_pull.py') -Force
 # gate/ 배포 — 하베스터(../gate)·pull(../gate)이 수확 쓸모 게이트+주장 검증 하네스를 import.
 #   이게 없으면 설치된 하베스터가 gate import 실패→무게이트 폴백(게이트 무력화). 필수.
@@ -75,13 +77,16 @@ else { Write-Host "  ⚠️ pip 실패 — 수동: $pyExe -m pip install youtube
 #    회장이 'Claude를 안 여는 날에도 수확/감독이 돌길' 원할 때만 필요. 원치 않으면 이 블록 skip 가능.
 $harvPath = Join-Path $ardOps 'harvester\car_harvester.py'
 $ghPath   = Join-Path $ardOps 'harvester\car_github_harvester.py'
-$supPath  = Join-Path $ardOps 'hooks\car_supervisor.py'
+$healPath = Join-Path $ardOps 'hooks\car_self_heal.py'
 try {
     schtasks /Create /F /SC DAILY  /ST 09:00 /TN "G2-ARD-Harvester"  /TR "`"$pyExe`" `"$harvPath`"" | Out-Null
     schtasks /Create /F /SC DAILY  /ST 09:15 /TN "G2-ARD-GitHub"     /TR "`"$pyExe`" `"$ghPath`"" | Out-Null
     schtasks /Create /F /SC ONLOGON          /TN "G2-ARD-GitHub-Logon" /TR "`"$pyExe`" `"$ghPath`"" | Out-Null
-    schtasks /Create /F /SC WEEKLY /D MON /ST 09:30 /TN "G2-ARD-Supervisor" /TR "`"$pyExe`" `"$supPath`"" | Out-Null
-    Write-Host "  ✅ Task Scheduler: Harvester(일 09:00)·GitHub(일 09:15 +로그온)·Supervisor(월 09:30)" -ForegroundColor Green
+    # 자가치유(GOAP): 매일 09:30 — 진단→복구(재수확·재감독·escalate). supervisor를 내부 실행.
+    # ★ 취약한 SessionStart 훅과 무관한 '신뢰 heartbeat'. 예전 weekly Supervisor 태스크를 대체(2026-07-20).
+    schtasks /Delete /F /TN "G2-ARD-Supervisor" 2>$null | Out-Null
+    schtasks /Create /F /SC DAILY /ST 09:30 /TN "G2-ARD-SelfHeal" /TR "`"$pyExe`" `"$healPath`"" | Out-Null
+    Write-Host "  ✅ Task Scheduler: Harvester(일 09:00)·GitHub(일 09:15 +로그온)·SelfHeal(일 09:30)" -ForegroundColor Green
 } catch {
     Write-Host "  ⚠️ Task Scheduler 등록 실패(관리자 권한 필요할 수 있음). 수동 등록 안내는 README 참조." -ForegroundColor Yellow
 }

@@ -33,6 +33,7 @@ QUEUE_DIR = ARD_DIR / "queue"
 STATE_FILE = ARD_DIR / "state.json"
 APPLIED_FILE = ARD_DIR / "applied.json"          # CAR이 적용할 때마다 기록하는 원장
 ORG_STATE_FILE = ARD_DIR / "org_state.json"      # 조직 리뷰 주기 상태 (OrgDev 트랙)
+SUP_STATE_FILE = ARD_DIR / "supervisor_state.json"  # 감독 마지막 실행 마커(SSOT) — self_heal·dispatch가 신선도 판정
 REPORTS_DIR = ARD_DIR / "reports"
 HARVESTER = ARD_DIR / "harvester" / "car_harvester.py"
 SKILL_USAGE = Path.home() / ".claude" / "skill_usage.jsonl"   # G2 기존 사용 신호
@@ -220,6 +221,15 @@ def main():
     try:
         (REPORTS_DIR / f"{date}_health.json").write_text(
             json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+    # 감독 실행 마커(SSOT) — 누가 실행하든(schtask·dispatch·self_heal) 여기 기록.
+    # self_heal의 supervision_live 목표가 이 마커로 신선도를 판정한다(예전엔 dispatch만 찍어
+    # self_heal이 직접 돌려도 마커 미갱신 → 목표 영구 미충족 버그가 있었음, 2026-07-20 수정).
+    try:
+        SUP_STATE_FILE.write_text(
+            json.dumps({"last_run": report["ts"]}, indent=2, ensure_ascii=False), encoding="utf-8")
     except Exception:
         pass
 
