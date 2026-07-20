@@ -360,6 +360,11 @@ def main():
     remaining = unmet_goals(final_ws)
     # 기계 건강도(GOAP 3목표 = '루프 부품이 도는가').
     mech = "GREEN" if not remaining else ("RED" if "fresh_harvest" in remaining or "supervision_live" in remaining else "YELLOW")
+    # 액션으로 세계를 바꿨으면 소화 지표도 재측정한다(GOAP 재측정 원칙).
+    # 예: triage_queue가 큐 59→24로 줄였는데 supervisor를 안 돌리면 health.json이 옛 59를 계속
+    # 보고해 '고쳤는데도 RED'로 오독된다(2026-07-20 실제 관측). 액션 있었으면 감독 갱신.
+    if actions_taken:
+        run_script(SUPERVISOR, [], timeout=60)
     # 소화 건강도(supervisor loop_health = '루프가 값을 내는가'). self_heal이 기계로 못 고치는 영역이지만
     # 여기 반영하지 않으면 self_heal.jsonl만 보고 GREEN으로 오판할 수 있음(독립검증 V8 지적) → 통합.
     sup = read_supervisor_health()
