@@ -15,12 +15,22 @@ LLM 비호출(저비용). 토큰 있으면(GITHUB_TOKEN/GH_TOKEN) rate limit↑,
 import argparse
 import json
 import os
+import socket
 import sys
+import time
 import urllib.request
 import urllib.error
 import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+# cp949 콘솔(회장 PC 기본·스케줄러 실행)에서 한글/em-dash 출력이 UnicodeEncodeError로
+# 스크립트를 죽이는 함정 방어 — dispatch/supervisor와 동일 패턴(2026-07-20 수확기에도 적용).
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 
 ARD_DIR = Path.home() / ".claude" / "ard"
 CONFIG_FILE = ARD_DIR / "config" / "sources.json"
@@ -106,6 +116,20 @@ def classify_trust(owner, stars, trusted):
 
 
 _TOKEN_DISABLED = False  # stale/invalid GH_TOKEN을 한 번 감지하면 이후 무인증으로
+_NET = {"ok": 0, "neterr": 0}  # 네트워크 도달성 추적 (2026-07-20: last_run 오염 방어)
+
+
+def wait_for_network(host="api.github.com", tries=4, delay=3):
+    """부팅 직후 스케줄 실행 시 DNS 미준비로 조용히 죽는 것을 방어.
+       DNS가 뜰 때까지 최대 tries×delay초(=12s) 대기. 끝내 안 뜨면 False.
+       (dispatch 인라인 호출 timeout=25s 예산 안에 맞춤 — 세션 시작 헛대기 방지.)"""
+    for _ in range(max(1, tries)):
+        try:
+            socket.getaddrinfo(host, 443)
+            return True
+        except OSError:
+            time.sleep(delay)
+    return False
 
 
 def gh_get(url):
@@ -126,14 +150,17 @@ def gh_get(url):
     try:
         req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=15) as resp:
+            _NET["ok"] += 1
             return json.loads(resp.read().decode("utf-8", errors="ignore")), None
     except urllib.error.HTTPError as e:
+        _NET["ok"] += 1  # 서버가 응답함 = 네트워크 도달 O (HTTP 상태코드는 도달성과 무관)
         if e.code == 401 and token and not _TOKEN_DISABLED:
             _TOKEN_DISABLED = True
             log("token_invalid_fallback_anon", note="GH_TOKEN 401 → 무인증 폴백")
             return gh_get(url)
         return None, f"HTTP {e.code}"
     except Exception as e:
+        _NET["neterr"] += 1  # URLError/getaddrinfo/timeout = 네트워크 미도달
         return None, str(e)
 
 
@@ -270,6 +297,13 @@ def main():
     if not should_run(state, interval, args.force):
         return 0
 
+    # 부팅 직후 DNS 미준비 방어(2026-07-20): 네트워크가 뜰 때까지 대기.
+    # 끝내 안 뜨면 state를 건드리지 않고 종료 → last_run 오염 없음 → 다음 시도가 재수확.
+    if not wait_for_network():
+        log("gh_run_aborted_network", note="DNS 미준비 — last_run 미갱신, 다음 시도 재수확")
+        print("[CAR GitHub] 네트워크 미준비 — 수확 보류(재시도 예정)")
+        return 0
+
     seen_releases = state.get("seen_releases", {})
     seen_repos = state.get("seen_repos", [])
     harvested = []
@@ -289,6 +323,13 @@ def main():
         max_results = search_cfg.get("max_results", 8)
         for query in search_cfg.get("queries", []):
             harvest_search(query, min_stars, days, seen_repos, harvested, max_results, trusted)
+
+    # 네트워크가 뜬 뒤에도 모든 API 호출이 미도달(getaddrinfo/timeout)했다면 last_run 미갱신.
+    # (부분 실패·HTTP 에러는 도달로 간주하고 정상 진행 — seen 갱신으로 재수확 방지.)
+    if _NET["ok"] == 0 and _NET["neterr"] > 0:
+        log("gh_run_aborted_all_unreachable", neterr=_NET["neterr"])
+        print("[CAR GitHub] 전 API 미도달 — 수확 보류(재시도 예정)")
+        return 0
 
     state["last_run"] = now_iso()
     state["seen_releases"] = seen_releases

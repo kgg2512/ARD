@@ -15,12 +15,22 @@ LLM을 호출하지 않는 저비용 단계 — 이해/적용은 CAR(Claude)가 
 """
 import argparse
 import json
+import socket
 import sys
+import time
 import urllib.request
 import urllib.error
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+# cp949 콘솔(회장 PC 기본·스케줄러 실행)에서 한글/em-dash 출력이 UnicodeEncodeError로
+# 스크립트를 죽이는 함정 방어 — dispatch/supervisor와 동일 패턴(2026-07-20 수확기에도 적용).
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 
 ARD_DIR = Path.home() / ".claude" / "ard"
 CONFIG_FILE = ARD_DIR / "config" / "sources.json"
@@ -87,6 +97,19 @@ def _gate_admit(item):
     except Exception as e:
         log("gate_error_admit", error=str(e))
         return True
+
+
+def wait_for_network(host="www.youtube.com", tries=6, delay=5):
+    """부팅 직후 스케줄 실행 시 DNS 미준비로 조용히 죽는 것을 방어.
+       DNS가 뜰 때까지 최대 tries×delay초 대기. 끝내 안 뜨면 False.
+       (호출부: False면 last_run을 갱신하지 말 것 → 다음 시도가 재수확)."""
+    for _ in range(max(1, tries)):
+        try:
+            socket.getaddrinfo(host, 443)
+            return True
+        except OSError:
+            time.sleep(delay)
+    return False
 
 
 def should_run(state, interval_hours, force):
@@ -189,12 +212,21 @@ def main():
     if not should_run(state, interval, args.force):
         return 0
 
+    # 부팅 직후 DNS 미준비 방어(2026-07-20): 네트워크가 뜰 때까지 대기.
+    # 끝내 안 뜨면 state를 건드리지 않고 종료 → last_run 오염 없음 → 다음 시도가 재수확.
+    # (이 가드 이전엔 네트워크 실패에도 last_run=now로 갱신돼 24h 게이트가 하루 종일 재시도를 막았음.)
+    if not wait_for_network():
+        log("run_aborted_network", note="DNS 미준비 — last_run 미갱신, 다음 시도 재수확")
+        print("[CAR Harvester] 네트워크 미준비 — 수확 보류(재시도 예정)")
+        return 0
+
     processed = set(state.get("processed_ids", []))
     channels = [c for c in config.get("youtube", []) if c.get("active", True)]
 
     # 수확 쓸모 게이트 초기화 — 이미 큐에 있는 id를 dedup seen으로 공급
     _init_gate(config, [p.stem for p in QUEUE_DIR.glob("*.json")])
     harvested, skipped_irrelevant, no_transcript, gate_rejected = 0, 0, 0, 0
+    fetch_ok = 0
 
     for ch in channels:
         cid = ch.get("channel_id", "")
@@ -203,6 +235,7 @@ def main():
         xml = fetch_rss(cid)
         if not xml:
             continue
+        fetch_ok += 1
         for video in parse_rss(xml)[:max_per]:
             vid = video["id"]
             if vid in processed:
@@ -239,6 +272,13 @@ def main():
             save_json(QUEUE_DIR / f"{vid}.json", item)
             harvested += 1
             log("harvested", id=vid, title=video["title"], channel=ch["name"], chars=len(transcript))
+
+    # 전 채널 페치 실패(네트워크 뜬 뒤에도 전부 차단/타임아웃) → last_run 미갱신하고 종료.
+    # 다음 시도가 재수확하도록 상태를 오염시키지 않는다(부분 실패는 정상 진행).
+    if channels and fetch_ok == 0:
+        log("run_aborted_all_fetch_failed", channels=len(channels))
+        print("[CAR Harvester] 전 채널 페치 실패 — 수확 보류(재시도 예정)")
+        return 0
 
     state["last_run"] = now_iso()
     state["processed_ids"] = list(processed)[-2000:]
