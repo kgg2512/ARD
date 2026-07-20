@@ -157,6 +157,36 @@ def archive_evicted(results, items_by_file):
     return moved
 
 
+def validate_l2(item):
+    """L2 판정의 '증거 부담 대칭' 게이트 (적대적 재검증 2026-07-20 지적 반영).
+
+    발견된 편향: EVICT 7건 중 6건의 required_probe가 "해당없음"이었고 APPROVAL 1건에만
+    5단계 프로브가 붙었다 → **적용하려면 증거가 필요하고 버리려면 불필요** → 판정이
+    통계적으로 EVICT로 흐른다. 실제로 오판 2건 발생(자막에 명시된 수치를 '없음'이라 단정).
+
+    그래서 EVICT에도 근거를 요구한다. 반환 (ok, 사유).
+    """
+    v = (item.get("verdict") or "").upper()
+    probe = str(item.get("required_probe") or "").strip()
+    reason = str(item.get("reason") or "").strip()
+    NULL = ("", "해당없음", "없음", "n/a", "none", "-")
+
+    if v == "EVICT":
+        # ① EVICT도 최소 근거 1줄 필수 — "왜 아닌지"를 확인 가능한 형태로
+        if reason.lower() in NULL or len(reason) < 10:
+            return False, "EVICT인데 근거가 비어있음 — 버리는 판정도 근거를 요구한다"
+        # ② baseline_covered=true면 '보유물이 실제로 그 기능을 하는가'를 확인한 흔적 필수.
+        #    '같은 범주에 뭔가 있다' ≠ '있는 게 더 낫다'(오판 2건이 모두 이 규칙을 통과했다).
+        if item.get("baseline_covered") is True and probe.lower() in NULL:
+            return False, ("baseline_covered=true인데 기능 동등성 프로브 없음 — "
+                           "파일 존재 확인은 기능 동등의 증거가 아니다")
+        # ③ 원문에 '없다'고 단정하려면 검색했다는 흔적이 있어야 한다(오판의 직접 원인).
+        if ("없음" in probe or "없다" in probe) and "검색" not in probe and "grep" not in probe.lower():
+            return False, ("원문에 '없음'을 단정했으나 검색 흔적 없음 — "
+                           "자막 검색 결과를 근거로 제시할 것")
+    return True, ""
+
+
 def apply_l2(verdicts_path):
     """L2(CAR 구조판정) 결과를 큐에 반영 — 판정만 하고 큐에 두면 '소화'가 아니다.
        EVICT→evicted/ · APPROVAL→approval/(회장 판단 대기) · APPLY→큐 잔류(프로브 검증 전엔 적용 불가).
@@ -168,12 +198,19 @@ def apply_l2(verdicts_path):
         return {}
     items = data.get("items") or []
     dests = {"EVICT": ARD_DIR / "evicted", "APPROVAL": ARD_DIR / "approval"}
-    moved = {"EVICT": 0, "APPROVAL": 0, "APPLY": 0, "미발견": 0}
+    moved = {"EVICT": 0, "APPROVAL": 0, "APPLY": 0, "미발견": 0, "게이트거부": 0}
+    rejected = []
     for v in items:
         vid, verdict = v.get("id"), (v.get("verdict") or "").upper()
         src = QUEUE_DIR / f"{vid}.json"
         if not src.exists():
             moved["미발견"] += 1
+            continue
+        # 증거 부담 대칭 게이트 — 근거 없는 판정은 반영하지 않고 큐에 남겨 재판정시킨다.
+        ok, why = validate_l2(v)
+        if not ok:
+            moved["게이트거부"] += 1
+            rejected.append((vid, str(v.get("title") or "")[:45], why))
             continue
         if verdict == "APPLY":          # 프로브 검증 통과 전엔 큐에 남긴다(생성≠검증)
             moved["APPLY"] += 1
@@ -199,7 +236,7 @@ def apply_l2(verdicts_path):
             moved[verdict] += 1
         except Exception:
             continue
-    return moved
+    return moved, rejected
 
 
 def main():
@@ -212,10 +249,12 @@ def main():
     args = ap.parse_args()
 
     if args.apply_l2:
-        m = apply_l2(args.apply_l2)
+        m, rej = apply_l2(args.apply_l2)
         remain = len(list(QUEUE_DIR.glob("*.json")))
         print(f"[apply-l2] EVICT {m.get('EVICT',0)} → evicted/ · APPROVAL {m.get('APPROVAL',0)} → approval/ "
-              f"· APPLY {m.get('APPLY',0)} 큐잔류(프로브 대기) · 미발견 {m.get('미발견',0)}")
+              f"· APPLY {m.get('APPLY',0)} 큐잔류 · 게이트거부 {m.get('게이트거부',0)} · 미발견 {m.get('미발견',0)}")
+        for vid, title, why in rej:
+            print(f"   ⛔ 판정거부 {vid} [{title}] — {why}")
         print(f"           큐 잔여 {remain}건")
         return 0
 
