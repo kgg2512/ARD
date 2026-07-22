@@ -21,7 +21,7 @@
 
 ## 배선 상태
 
-- **하베스터(`car_github_harvester.py`):** `save_json(QUEUE_DIR/…)` 직전 `apply_gates.should_queue()` 호출. REJECT면 큐에 안 넣고 `log("gate_reject", …)`. 게이트 import 실패 시 **무게이트로 폴백**(회귀 0 — 방어적).
+- **하베스터(`car_github_harvester.py`·`car_harvester.py`):** `save_json(QUEUE_DIR/…)` 직전 `apply_gates.should_queue()` 호출. REJECT면 큐에 안 넣고 `log("gate_reject", …)`. **게이트 평가 불가(import/실행 실패) 시 fail-closed reject(I2, 2026-07-22 H5)** — 미검증 항목이 큐에 새지 않게. 과거 '무게이트 폴백(fail-open)'은 제거. 게이트 고장은 log(`gate_*_failclosed`) + harvest stale로 supervisor가 감지.
 - **pull(`car_pull.py`):** 후보 아이템에 `verify_item()` 실행 → UNVERIFIED 주장 목록을 CAR에 제시(적용·증류 전 원본/런타임 확인 강제).
 
 ## 실행
