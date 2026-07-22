@@ -197,6 +197,18 @@ def main():
     ARD_DIR.mkdir(parents=True, exist_ok=True)
     QUEUE_DIR.mkdir(parents=True, exist_ok=True)
 
+    # ── 수확 백프레셔 (H2/AQ-3, 2026-07-22) ──────────────────────────────────
+    # 큐가 적체(≥15)면 신규 수확 skip → 소화(내재화)가 밀린 채 수확만 쌓여 digestion RED가
+    # 되는 것을 차단. self_heal worst-of 보고와 정합(소화 정체를 수확이 악화시키지 않음).
+    # 재개 = 큐 < GATE로 자동(소화되면). --force로 무시 가능. 아카이브 아님(일시 억제).
+    BACKPRESSURE_GATE = 15
+    qn = len(list(QUEUE_DIR.glob("*.json")))
+    if qn >= BACKPRESSURE_GATE and not args.force:
+        log("harvest_backpressure", queue=qn, gate=BACKPRESSURE_GATE)
+        print(f"[CAR Harvester] 백프레셔 발동 — 큐 {qn} ≥ {BACKPRESSURE_GATE}. 신규 수확 skip "
+              f"(소화되면 자동 재개, --force 무시 가능). 소화=digest_triage/car_pull.")
+        return 0
+
     config = load_json(CONFIG_FILE, {})
     if not config:
         print("[CAR Harvester] config 없음:", CONFIG_FILE, "(install.ps1 실행 필요)")
