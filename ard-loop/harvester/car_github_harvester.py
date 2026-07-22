@@ -88,9 +88,12 @@ def _init_gate(config, seen_ids):
 
 
 def _gate_admit(item):
-    """큐 적재 허용 여부. REJECT면 False + log("gate_reject"). 오류 시 fail-open(True)."""
+    """큐 적재 허용 여부. **fail-closed(I2, 2026-07-22 H5):** 게이트 평가 불가면 reject.
+    무게이트로 미검증 항목이 큐에 새는 것을 막는다(과거 fail-open 폴백 제거)."""
     if not (_GATE and _GATE_CTX):
-        return True
+        log("gate_unavailable_failclosed", id=item.get("id"),
+            note="게이트 미로드 → fail-closed reject(I2)")
+        return False
     try:
         keep, res = _GATE.should_queue(item, _GATE_CTX)
         if not keep:
@@ -98,8 +101,9 @@ def _gate_admit(item):
                 reasons=res.get("reasons"))
         return keep
     except Exception as e:
-        log("gate_error_admit", error=str(e))
-        return True
+        log("gate_error_failclosed", id=item.get("id"), error=str(e),
+            note="게이트 평가 예외 → fail-closed reject(I2)")
+        return False
 
 
 def classify_trust(owner, stars, trusted):
